@@ -6,16 +6,20 @@
  * - 수신 시 해당 userKey의 토큰/세션 폐기
  */
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/src/lib/prisma';
 
 function verifyBasicAuth(req: NextRequest): boolean {
   const secret = process.env.TOSS_CALLBACK_SECRET;
-  if (!secret) return true; // 환경변수 미설정 시 검증 스킵 (개발 환경)
+  if (!secret) return false; // fail-closed: secret 미설정이면 모든 요청 거부
 
   const auth = req.headers.get('authorization') ?? '';
   if (!auth.startsWith('Basic ')) return false;
   const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
-  return decoded === secret;
+  const decodedBuf = Buffer.from(decoded);
+  const secretBuf = Buffer.from(secret);
+  if (decodedBuf.length !== secretBuf.length) return false;
+  return crypto.timingSafeEqual(decodedBuf, secretBuf);
 }
 
 async function handleUnlink(req: NextRequest): Promise<NextResponse> {

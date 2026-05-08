@@ -44,7 +44,21 @@ export async function POST(req: NextRequest) {
         where: { id: userId, [field]: { lt: cap } },
         data: { [field]: { increment: grant.rewardAmount } },
       });
-      const capReached = updateResult.count === 0;
+      let capReached = false;
+      if (updateResult.count === 0) {
+        // count===0 의 원인을 검증: user 부재(cascade 삭제) 인지 진짜 cap 도달인지 구분
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { aiCredits: true, csvImportCredits: true },
+        });
+        if (!current) throw new Error('user_not_found');
+        const balance = field === 'aiCredits' ? current.aiCredits : current.csvImportCredits;
+        if (balance >= cap) {
+          capReached = true;
+        } else {
+          throw new Error('redeem_state_inconsistent');
+        }
+      }
 
       // nonce 상태 마킹 — capReached 면 REJECTED, 아니면 REDEEMED.
       // 트랜잭션 정상 commit 으로 마킹 보장 (이전엔 throw 가 update 까지 롤백시켜 nonce 재사용 가능)
