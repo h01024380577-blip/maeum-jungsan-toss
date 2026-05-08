@@ -18,6 +18,26 @@ git push aws main
 echo "🖥️  Updating EC2 server..."
 ssh "$EC2_HOST" "cd $EC2_DIR && git pull origin main && npm install --legacy-peer-deps 2>&1 | tail -3 && npx prisma generate && npm run build:next 2>&1 | tail -3 && set -a && source .env && set +a && pm2 restart maeum-jungsan --update-env"
 
+# --- 2.5. Smoke test: 새 배포가 정상 부팅됐는지 확인 ---
+# /api/health 가 env validation + DB ping 검증 → 200 또는 503.
+# pm2 fresh start 가 필요한 경우(신규 env 추가 등) 여기서 즉시 detect.
+HEALTH_URL="https://maeum-jungsan.duckdns.org/api/health"
+echo "🩺 Health check ($HEALTH_URL)..."
+HEALTH_RES=$(curl --silent --show-error --output /tmp/maeum-health.json --write-out '%{http_code}' \
+  --retry 5 --retry-delay 3 --retry-connrefused --max-time 30 \
+  "$HEALTH_URL" || echo "000")
+if [ "$HEALTH_RES" != "200" ]; then
+  echo ""
+  echo "❌ Health check FAILED (HTTP $HEALTH_RES)"
+  echo "   Response body:"
+  cat /tmp/maeum-health.json 2>/dev/null || echo "   (no response body)"
+  echo ""
+  echo "👉 ssh $EC2_HOST 'pm2 logs maeum-jungsan --err --lines 30 --nostream' 로 원인 확인."
+  echo "👉 신규 env 변수 누락이면 .env 추가 + pm2 delete + pm2 start npm --name maeum-jungsan -- start (memory feedback_pm2_env_reset.md)"
+  exit 1
+fi
+echo "✅ Health check passed (200)"
+
 # --- 3. AIT 번들 재생성 (클라이언트 변경 시) ---
 # 최근 커밋에서 클라이언트 파일 변경 여부 확인
 CLIENT_CHANGED=$(git diff HEAD~1 --name-only -- \
