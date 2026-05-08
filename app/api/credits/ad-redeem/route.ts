@@ -33,34 +33,29 @@ export async function POST(req: NextRequest) {
         throw new Error('nonce_expired');
       }
 
-      await tx.adRewardGrant.update({
-        where: { id: grant.id },
-        data: { status: 'REDEEMED', redeemedAt: new Date() },
-      });
-
-      // 잔고 증가 (cap 초과 방지)
       const field = grant.rewardType === 'AI_CREDIT' ? 'aiCredits' : 'csvImportCredits';
       const cap =
         grant.rewardType === 'AI_CREDIT'
           ? CREDITS_CONFIG.ai.cap
           : CREDITS_CONFIG.csv.cap;
 
-      // 원자적 increment (cap 미만인 경우에만)
+      // 원자적 increment (cap 미만인 경우에만). cap 도달이면 count===0
       const updateResult = await tx.user.updateMany({
         where: { id: userId, [field]: { lt: cap } },
         data: { [field]: { increment: grant.rewardAmount } },
       });
+      const capReached = updateResult.count === 0;
 
-      // cap 초과로 충전 실패한 경우에도 광고 시청은 카운트 + 실패 기록
-      if (updateResult.count === 0) {
-        await tx.adRewardGrant.update({
-          where: { id: grant.id },
-          data: { status: 'REJECTED' },
-        });
-        throw new Error('cap_reached');
-      }
+      // nonce 상태 마킹 — capReached 면 REJECTED, 아니면 REDEEMED.
+      // 트랜잭션 정상 commit 으로 마킹 보장 (이전엔 throw 가 update 까지 롤백시켜 nonce 재사용 가능)
+      await tx.adRewardGrant.update({
+        where: { id: grant.id },
+        data: capReached
+          ? { status: 'REJECTED' }
+          : { status: 'REDEEMED', redeemedAt: new Date() },
+      });
 
-      // 광고 시청 카운터 증가 (일일 상한은 nonce 발급 시 이미 체크됨)
+      // 광고 시청 카운터는 cap 여부와 무관하게 증가 (시청은 발생함)
       await tx.user.update({
         where: { id: userId },
         data: { adWatchesToday: { increment: 1 } },
@@ -71,8 +66,15 @@ export async function POST(req: NextRequest) {
         select: { aiCredits: true, csvImportCredits: true, adWatchesToday: true },
       });
 
-      return { grant, user: user! };
+      return { grant, user: user!, capReached };
     });
+
+    if (result.capReached) {
+      return withCors(
+        req,
+        NextResponse.json({ success: false, reason: 'cap_reached' }, { status: 409 }),
+      );
+    }
 
     const balance =
       result.grant.rewardType === 'AI_CREDIT'
@@ -101,7 +103,6 @@ export async function POST(req: NextRequest) {
       nonce_user_mismatch: 403,
       nonce_already_used: 409,
       nonce_expired: 410,
-      cap_reached: 409,
     };
     return withCors(
       req,
