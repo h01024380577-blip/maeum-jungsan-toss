@@ -387,7 +387,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                       }`}
                     >
                       <div className={`w-2 h-2 rounded-full ${transactionType === 'INCOME' ? 'bg-white' : 'bg-blue-400'}`} />
-                      <span>받음 (수입)</span>
+                      <span>받은 마음 (수입)</span>
                     </button>
                     <button
                       onClick={() => setTransactionType('EXPENSE')}
@@ -398,7 +398,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                       }`}
                     >
                       <div className={`w-2 h-2 rounded-full ${transactionType === 'EXPENSE' ? 'bg-white' : 'bg-red-400'}`} />
-                      <span>보냄 (지출)</span>
+                      <span>보낸 마음 (지출)</span>
                     </button>
                   </div>
                 </div>
@@ -509,7 +509,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   <p className="text-xs text-blue-700 leading-relaxed">
                     총 <span className="font-bold">{totalCount}건</span>의 데이터를 가져옵니다.
                     {importMode === 'backup' && (
-                      <> (받음 <span className="font-bold text-blue-700">{incomeCount}건</span> · 보냄 <span className="font-bold text-red-600">{expenseCount}건</span>)</>
+                      <> (받은 마음 <span className="font-bold text-blue-700">{incomeCount}건</span> · 보낸 마음 <span className="font-bold text-red-600">{expenseCount}건</span>)</>
                     )}
                   </p>
                 </div>

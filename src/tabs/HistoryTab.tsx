@@ -142,7 +142,7 @@ export default function HistoryTab() {
 
         {/* Filter */}
         <div className="flex space-x-2">
-          {([['all', '전체'], ['given', '보냄'], ['received', '받음']] as const).map(([key, label]) => (
+          {([['all', '전체'], ['given', '보낸 마음'], ['received', '받은 마음']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setFilter(key)} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${filter === key ? 'bg-blue-500 text-white shadow-sm' : 'bg-white text-gray-400 border border-gray-100'}`}>
               {label}
             </button>
@@ -231,10 +231,10 @@ export default function HistoryTab() {
             {/* 보냄/받음 토글 */}
             <div className="flex bg-gray-100 p-1 rounded-xl">
               <button onClick={() => setEditTarget({...editTarget, type: 'EXPENSE', isIncome: false})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${editTarget.type === 'EXPENSE' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-400'}`}>
-                <ArrowUpRight size={12} /><span>보냄 (OUT)</span>
+                <ArrowUpRight size={12} /><span>보낸 마음 (OUT)</span>
               </button>
               <button onClick={() => setEditTarget({...editTarget, type: 'INCOME', isIncome: true})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${editTarget.type === 'INCOME' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
-                <ArrowDownLeft size={12} /><span>받음 (IN)</span>
+                <ArrowDownLeft size={12} /><span>받은 마음 (IN)</span>
               </button>
             </div>
 

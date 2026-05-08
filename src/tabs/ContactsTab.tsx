@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Search, UserPlus, ArrowRight, User, CheckCircle, AlertCircle, Star, Check, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, UserPlus, ArrowRight, User, CheckCircle, AlertCircle, Star, Check, X, ArrowUp } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContactDetail from '../components/ContactDetail';
@@ -12,6 +12,9 @@ export default function ContactsTab() {
   const [search, setSearch] = useState('');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'recent'>('name');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollParentRef = useRef<HTMLElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const getBalance = (id: string) => {
     const ce = entries.filter(e => e.contactId === id);
@@ -38,6 +41,24 @@ export default function ContactsTab() {
 
   const toggleFavorite = (id: string, current: boolean) => {
     updateContact(id, { isFavorite: !current });
+  };
+
+  useEffect(() => {
+    const scrollParent = rootRef.current?.closest('main') as HTMLElement | null;
+    if (!scrollParent) return;
+
+    scrollParentRef.current = scrollParent;
+    const handleScroll = () => {
+      setShowScrollTop(scrollParent.scrollTop > 360);
+    };
+
+    handleScroll();
+    scrollParent.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollParent.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    scrollParentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -199,7 +220,7 @@ export default function ContactsTab() {
   }
 
   return (
-    <div className="pb-4">
+    <div ref={rootRef} className="pb-4">
       <div className="px-5 pt-14 pb-4 bg-white">
         <div className="flex items-center justify-between">
           <div>
@@ -220,7 +241,7 @@ export default function ContactsTab() {
         </div>
 
         <div className="flex space-x-2">
-          {([['name', '이름순'], ['balance', '수지순'], ['recent', '최근순']] as const).map(([key, label]) => (
+          {([['name', '이름순'], ['recent', '최근순'], ['balance', '마음순']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setSortBy(key)} className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${sortBy === key ? 'bg-blue-500 text-white' : 'bg-white text-gray-400 border border-gray-100'}`}>
               {label}
             </button>
@@ -456,6 +477,23 @@ export default function ContactsTab() {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            type="button"
+            onClick={scrollToTop}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.16 }}
+            className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+88px)] right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-200 active:scale-95 md:right-[calc((100vw-430px)/2+24px)]"
+            aria-label="연락처 목록 상단으로 이동"
+          >
+            <ArrowUp size={20} strokeWidth={2.4} />
+          </motion.button>
         )}
       </AnimatePresence>
     </div>

@@ -7,7 +7,7 @@ import { useStore } from "@/src/store/useStore";
 import Onboarding from "@/src/components/Onboarding";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
 
-const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
+const SKIP_ONBOARDING_PATHS = ['/terms', '/intro', '/ui-prototype'];
 
 function InnerProviders({ children }: { children: React.ReactNode }) {
   const { loadFromSupabase, isLoaded, tossUserId } = useStore();

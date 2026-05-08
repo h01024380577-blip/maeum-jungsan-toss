@@ -337,14 +337,14 @@ export default function HomeTab() {
           <div className="bg-blue-50 rounded-2xl p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <ArrowDownLeft size={11} className="text-blue-500" />
-              <span className="text-[9px] font-bold text-blue-400 uppercase">받음</span>
+              <span className="text-[9px] font-bold text-blue-400 uppercase">받은 마음</span>
             </div>
             <p className="text-base font-black text-blue-600">{(totalReceived / 10000).toFixed(0)}<span className="text-[10px] font-bold text-blue-400">만</span></p>
           </div>
           <div className="bg-red-50 rounded-2xl p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <ArrowUpRight size={11} className="text-red-400" />
-              <span className="text-[9px] font-bold text-red-400 uppercase">보냄</span>
+              <span className="text-[9px] font-bold text-red-400 uppercase">보낸 마음</span>
             </div>
             <p className="text-base font-black text-red-500">{(totalGiven / 10000).toFixed(0)}<span className="text-[10px] font-bold text-red-400">만</span></p>
           </div>
@@ -493,10 +493,10 @@ export default function HomeTab() {
               <div className="space-y-3 flex-1 overflow-y-auto pb-2 no-scrollbar">
                 <div className="flex bg-gray-100 p-1 rounded-xl">
                   <button onClick={() => setParsedData({...parsedData, type: 'EXPENSE', isIncome: false})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${parsedData.type === 'EXPENSE' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-400'}`}>
-                    <ArrowUpRight size={12} /><span>보냄 (OUT)</span>
+                    <ArrowUpRight size={12} /><span>보낸 마음 (OUT)</span>
                   </button>
                   <button onClick={() => setParsedData({...parsedData, type: 'INCOME', isIncome: true})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${parsedData.type === 'INCOME' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
-                    <ArrowDownLeft size={12} /><span>받음 (IN)</span>
+                    <ArrowDownLeft size={12} /><span>받은 마음 (IN)</span>
                   </button>
                 </div>
 

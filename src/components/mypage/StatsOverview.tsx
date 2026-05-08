@@ -61,7 +61,7 @@ export default function StatsOverview() {
       <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
         <div className="bg-blue-50 rounded-2xl p-3.5 text-center">
           <ArrowDownLeft size={14} className="text-blue-500 mx-auto mb-1" />
-          <p className="text-[10px] font-bold text-blue-400">받음</p>
+          <p className="text-[10px] font-bold text-blue-400">받은 마음</p>
           <p className="text-base font-black text-blue-600">
             {(totalIncome / 10000).toFixed(0)}
             <span className="text-[10px] text-blue-400">만</span>
@@ -69,7 +69,7 @@ export default function StatsOverview() {
         </div>
         <div className="bg-red-50 rounded-2xl p-3.5 text-center">
           <ArrowUpRight size={14} className="text-red-400 mx-auto mb-1" />
-          <p className="text-[10px] font-bold text-red-400">보냄</p>
+          <p className="text-[10px] font-bold text-red-400">보낸 마음</p>
           <p className="text-base font-black text-red-500">
             {(totalExpense / 10000).toFixed(0)}
             <span className="text-[10px] text-red-400">만</span>
@@ -98,7 +98,7 @@ export default function StatsOverview() {
             tab === 'INCOME' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'
           }`}
         >
-          받음
+          받은 마음
         </button>
         <button
           onClick={() => setTab('EXPENSE')}
@@ -106,7 +106,7 @@ export default function StatsOverview() {
             tab === 'EXPENSE' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-400'
           }`}
         >
-          보냄
+          보낸 마음
         </button>
       </div>
 

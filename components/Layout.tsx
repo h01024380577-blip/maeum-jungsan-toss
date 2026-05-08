@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { Home, Calendar as CalendarIcon, History, User, BookUser } from 'lucide-react';
+import { Home, Calendar as CalendarIcon, ClipboardPaste, User, BookUser } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -10,7 +10,7 @@ type Tab = 'home' | 'calendar' | 'history' | 'stats' | 'contacts';
 const tabs: { key: Tab; icon: typeof Home; label: string; path: string }[] = [
   { key: 'home', icon: Home, label: '홈', path: '/' },
   { key: 'calendar', icon: CalendarIcon, label: '달력', path: '/calendar' },
-  { key: 'history', icon: History, label: '내역', path: '/history' },
+  { key: 'history', icon: ClipboardPaste, label: '내역', path: '/history' },
   { key: 'contacts', icon: BookUser, label: '연락처', path: '/contacts' },
   { key: 'stats', icon: User, label: 'MY', path: '/stats' },
 ];

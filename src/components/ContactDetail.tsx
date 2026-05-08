@@ -207,11 +207,11 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
           </div>
           <div className="flex justify-between">
             <div>
-              <p className="text-[9px] font-bold text-gray-400 uppercase">보냄 (OUT)</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase">보낸 마음 (OUT)</p>
               <p className="text-sm font-black text-red-500">{given.toLocaleString()}</p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] font-bold text-gray-400 uppercase">받음 (IN)</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase">받은 마음 (IN)</p>
               <p className="text-sm font-black text-blue-600">{received.toLocaleString()}</p>
             </div>
           </div>
