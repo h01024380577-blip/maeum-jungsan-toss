@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { verifyJwt } from '@/src/lib/jwt';
+import { resolveDbUserId } from '@/src/lib/credits';
 import { corsResponse, withCors } from '@/src/lib/cors';
 
 const VALID_SOURCES = ['MANUAL', 'URL', 'OCR', 'SMS_PASTE', 'CSV'] as const;
@@ -10,20 +10,6 @@ function normalizeSource(raw: unknown): TransactionSourceValue | undefined {
   if (typeof raw !== 'string') return undefined;
   const upper = raw.toUpperCase() as TransactionSourceValue;
   return (VALID_SOURCES as readonly string[]).includes(upper) ? upper : undefined;
-}
-
-function getUserId(req: NextRequest): string | null {
-  // 1순위: Bearer 토큰
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const jwt = verifyJwt(authHeader.slice(7));
-    if (jwt) return jwt.userId;
-  }
-  // 2순위: 쿠키 (하위호환)
-  const cookie = req.cookies.get('toss_user_id')?.value;
-  if (cookie) return cookie;
-  // 3순위: x-user-id 헤더 (게스트)
-  return req.headers.get('x-user-id') ?? null;
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -53,7 +39,7 @@ function toEventEntry(event: any, tx: any) {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = getUserId(req);
+  const userId = await resolveDbUserId(req);
   if (!userId) return withCors(req, NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
   const events = await prisma.event.findMany({
     where: { userId },
@@ -64,34 +50,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = getUserId(req);
+  const userId = await resolveDbUserId(req);
   if (!userId) return withCors(req, NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
   const body = await req.json();
+  if (typeof body?.eventType !== 'string') {
+    return withCors(req, NextResponse.json({ error: 'invalid_event_type' }, { status: 400 }));
+  }
   const result = await prisma.$transaction(async (tx: any) => {
-    // 로그인 사용자: toss_user_id 쿠키 = DB user.id
-    // 비로그인 게스트: x-user-id 헤더 = device ID
-    let realUserId = userId;
-    const authHeader = req.headers.get('authorization');
-    const isLoggedIn = !!(authHeader?.startsWith('Bearer ') && verifyJwt(authHeader.slice(7))) || !!req.cookies.get('toss_user_id')?.value;
-    if (!isLoggedIn) {
-      // 비로그인 게스트만 upsert 필요
-      const user = await tx.user.upsert({
-        where: { tossUserKey: userId },
-        update: {},
-        create: { tossUserKey: userId },
-        select: { id: true },
-      });
-      realUserId = user.id;
-    }
     let contactId = body.contactId || null;
     if (!contactId && body.targetName) {
-      const existing = await tx.contact.findFirst({ where: { userId: realUserId, name: body.targetName } });
-      contactId = existing ? existing.id : (await tx.contact.create({ data: { userId: realUserId, name: body.targetName, relation: body.relation || '지인' } })).id;
+      const existing = await tx.contact.findFirst({ where: { userId, name: body.targetName } });
+      contactId = existing ? existing.id : (await tx.contact.create({ data: { userId, name: body.targetName, relation: body.relation || '지인' } })).id;
     }
-    const event = await tx.event.create({ data: { userId: realUserId, contactId, eventType: body.eventType.toUpperCase(), targetName: body.targetName, date: new Date(body.date), location: body.location ?? '', relation: body.relation ?? '', memo: body.memo ?? '', account: body.account ?? '', customEventName: body.customEventName ?? null } });
+    const event = await tx.event.create({ data: { userId, contactId, eventType: body.eventType.toUpperCase(), targetName: body.targetName, date: new Date(body.date), location: body.location ?? '', relation: body.relation ?? '', memo: body.memo ?? '', account: body.account ?? '', customEventName: body.customEventName ?? null } });
     const source = normalizeSource(body.source);
-    const transaction = await tx.transaction.create({ data: { eventId: event.id, userId: realUserId, type: body.type ?? 'EXPENSE', amount: Number(body.amount) || 0, account: body.account ?? '', relation: body.relation ?? '', recommendationReason: body.recommendationReason ?? '', ...(source ? { source } : {}) } });
-    // 생성/조회된 contact 정보 반환 (클라이언트 store 동기화용)
+    const transaction = await tx.transaction.create({ data: { eventId: event.id, userId, type: body.type ?? 'EXPENSE', amount: Number(body.amount) || 0, account: body.account ?? '', relation: body.relation ?? '', recommendationReason: body.recommendationReason ?? '', ...(source ? { source } : {}) } });
     let contact = null;
     if (contactId) {
       contact = await tx.contact.findUnique({ where: { id: contactId } });
@@ -111,7 +84,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const userId = getUserId(req);
+  const userId = await resolveDbUserId(req);
   if (!userId) return withCors(req, NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return withCors(req, NextResponse.json({ error: 'Missing id' }, { status: 400 }));
@@ -120,7 +93,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const userId = getUserId(req);
+  const userId = await resolveDbUserId(req);
   if (!userId) return withCors(req, NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return withCors(req, NextResponse.json({ error: 'Missing id' }, { status: 400 }));

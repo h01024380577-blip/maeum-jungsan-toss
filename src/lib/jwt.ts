@@ -1,6 +1,12 @@
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'heartbook-dev-jwt-secret';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
 
 function base64url(data: string | Buffer): string {
   return Buffer.from(data).toString('base64url');
@@ -15,7 +21,7 @@ export function signJwt(payload: { userId: string; userKey: string }): string {
     exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 14,
   }));
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', getJwtSecret())
     .update(`${header}.${body}`)
     .digest('base64url');
   return `${header}.${body}.${signature}`;
@@ -26,11 +32,16 @@ export function verifyJwt(token: string): { userId: string; userKey: string } | 
   try {
     const [header, body, signature] = token.split('.');
     if (!header || !body || !signature) return null;
+    const headerJson = JSON.parse(Buffer.from(header, 'base64url').toString());
+    if (headerJson.alg !== 'HS256') return null;
     const expected = crypto
-      .createHmac('sha256', JWT_SECRET)
+      .createHmac('sha256', getJwtSecret())
       .update(`${header}.${body}`)
       .digest('base64url');
-    if (signature !== expected) return null;
+    const sigBuf = Buffer.from(signature, 'base64url');
+    const expBuf = Buffer.from(expected, 'base64url');
+    if (sigBuf.length !== expBuf.length) return null;
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return { userId: payload.userId, userKey: payload.userKey };
