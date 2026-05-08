@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { fetchPageHtml } from '@/src/lib/fetchPage';
+import { assertSafePublicUrl } from '@/src/lib/urlSafety';
 import { extractMetaTags, extractJsonLd, extractBodyText, hasEnoughData } from '@/src/lib/parseUrl';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import {
@@ -107,17 +108,20 @@ async function fetchRenderedText(url: string): Promise<string | null> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const url = body?.url;
+    const rawUrl = body?.url;
 
-    if (!url || typeof url !== 'string') {
+    if (!rawUrl || typeof rawUrl !== 'string') {
       return withCors(request, NextResponse.json(
         { success: false, reason: 'invalid_url', message: 'URL이 필요합니다.' },
         { status: 400 },
       ));
     }
-    try { new URL(url); } catch {
+    let safeUrl: string;
+    try {
+      safeUrl = (await assertSafePublicUrl(rawUrl)).toString();
+    } catch {
       return withCors(request, NextResponse.json(
-        { success: false, reason: 'invalid_url', message: '올바른 URL 형식이 아닙니다.' },
+        { success: false, reason: 'invalid_url', message: '지원하지 않는 URL입니다.' },
         { status: 400 },
       ));
     }
@@ -158,12 +162,19 @@ export async function POST(request: NextRequest) {
     let fetchSuccess = false;
 
     try {
-      const html = await fetchPageHtml(url);
+      const html = await fetchPageHtml(safeUrl);
       fetchSuccess = true;
       meta = extractMetaTags(html);
       jsonLd = extractJsonLd(html);
       bodyText = extractBodyText(html);
-    } catch {}
+    } catch (e: any) {
+      if (e?.message === 'unsafe_url') {
+        return withCors(request, NextResponse.json(
+          { success: false, reason: 'invalid_url', message: '지원하지 않는 URL입니다.' },
+          { status: 400 },
+        ));
+      }
+    }
 
     // Phase 1a: og + body 텍스트가 충분하면 바로 분석
     if (fetchSuccess && hasEnoughData(meta, bodyText) && bodyText.length > 50) {
@@ -197,7 +208,7 @@ export async function POST(request: NextRequest) {
 
     // ========== Phase 2: Jina Reader (SPA 렌더링 대응) ==========
     try {
-      const renderedText = await fetchRenderedText(url);
+      const renderedText = await fetchRenderedText(safeUrl);
       if (renderedText && renderedText.length > 100) {
         const prompt = `아래는 경조사 초대장 웹페이지의 텍스트 내용이야.
 이 데이터에서 경조사 정보를 추출해줘.
@@ -231,7 +242,7 @@ ${OUTPUT_SCHEMA}`;
     try {
       const prompt = `다음 URL은 한국 경조사 초대장 링크야.
 이 URL의 실제 페이지 내용을 읽고 경조사 정보를 추출해줘.
-URL: ${url}
+URL: ${safeUrl}
 반드시 페이지에서 읽은 실제 데이터만 사용해. 추측하지 마.
 
 다음 JSON 형식으로 반환해:

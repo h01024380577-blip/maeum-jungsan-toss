@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kstStartOfToday } from './credits';
+import { kstStartOfToday, looksLikeTossUserKey, normalizeGuestDeviceId } from './credits';
 
 describe('kstStartOfToday', () => {
   it('KST 00:00 이후 시각은 같은 KST 날짜의 00:00을 반환한다', () => {
@@ -40,5 +40,22 @@ describe('kstStartOfToday', () => {
     expect(result.getUTCSeconds()).toBe(0);
     expect(result.getUTCMinutes()).toBe(0);
     expect(result.getUTCHours()).toBe(15);
+  });
+});
+
+describe('guest identity helpers', () => {
+  it('normalizes valid guest device ids', () => {
+    expect(normalizeGuestDeviceId('  device-123  ')).toBe('device-123');
+  });
+
+  it('rejects empty or oversized guest device ids', () => {
+    expect(normalizeGuestDeviceId('   ')).toBeNull();
+    expect(normalizeGuestDeviceId('a'.repeat(192))).toBeNull();
+  });
+
+  it('detects numeric Toss user keys', () => {
+    expect(looksLikeTossUserKey('123456789')).toBe(true);
+    expect(looksLikeTossUserKey('device-123')).toBe(false);
+    expect(looksLikeTossUserKey('6f3b7e18-1f95-49e4-bf9e-4377f2d0c0b4')).toBe(false);
   });
 });

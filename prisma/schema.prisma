@@ -11,6 +11,7 @@ datasource db {
 model User {
   id                   String    @id @default(cuid())
   tossUserKey          String?   @unique
+  guestDeviceId        String?   @unique
   name                 String? // 복호화된 이름 (복호화 키 없으면 null)
   accessToken          String?
   refreshToken         String?

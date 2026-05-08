@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { assertSafePublicUrl, resolveSafeRedirectUrl } from './urlSafety';
 
 export const SCRAPER_USER_AGENT = 'facebookexternalhit/1.1; kakaotalk-scrap/1.0';
 
@@ -19,7 +20,7 @@ function extractMetaRefreshUrl(html: string): string | null {
  * URL의 HTML을 fetch. 카카오봇 UA 사용, meta refresh 리다이렉트 처리.
  */
 export async function fetchPageHtml(url: string): Promise<string> {
-  let currentUrl = url;
+  let currentUrl = (await assertSafePublicUrl(url)).toString();
 
   for (let i = 0; i < MAX_REDIRECTS; i++) {
     let response: Response;
@@ -30,11 +31,18 @@ export async function fetchPageHtml(url: string): Promise<string> {
           'Accept': 'text/html,application/xhtml+xml',
           'Accept-Language': 'ko-KR,ko;q=0.9',
         },
-        redirect: 'follow',
+        redirect: 'manual',
         signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
     } catch (err) {
       throw new Error('fetch_failed');
+    }
+
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('fetch_failed');
+      currentUrl = await resolveSafeRedirectUrl(currentUrl, location);
+      continue;
     }
 
     if (response.status === 403 || response.status === 429) {
@@ -50,7 +58,7 @@ export async function fetchPageHtml(url: string): Promise<string> {
     // meta refresh 리다이렉트 확인
     const redirectUrl = extractMetaRefreshUrl(html);
     if (redirectUrl && i < MAX_REDIRECTS - 1) {
-      currentUrl = redirectUrl;
+      currentUrl = await resolveSafeRedirectUrl(currentUrl, redirectUrl);
       continue;
     }
 

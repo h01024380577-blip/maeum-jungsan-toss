@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchPageHtml, SCRAPER_USER_AGENT } from './fetchPage';
 
+vi.mock('node:dns/promises', () => ({
+  default: {
+    lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+  },
+}));
+
 // global fetch mock
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -47,6 +53,19 @@ describe('fetchPageHtml', () => {
       .mockResolvedValueOnce(mockResponse(finalHtml));
 
     const html = await fetchPageHtml('https://short.url/abc');
+    expect(html).toContain('최종 페이지');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('HTTP location 리다이렉트를 따라간다', async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse('', {
+        status: 302,
+        headers: { Location: 'https://final.com/page' },
+      }))
+      .mockResolvedValueOnce(mockResponse('<html><body>최종 페이지</body></html>'));
+
+    const html = await fetchPageHtml('https://start.com/page');
     expect(html).toContain('최종 페이지');
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
