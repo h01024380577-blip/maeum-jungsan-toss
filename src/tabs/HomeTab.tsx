@@ -117,6 +117,21 @@ const eventIcon = (t: string, size = 14) => {
 
 const eventLabel = (t: string) => t === 'wedding' ? '결혼' : t === 'funeral' ? '부고' : t === 'birthday' ? '생일' : '기타';
 
+const eventOptions: { value: EventType; label: string; Icon: typeof Heart }[] = [
+  { value: 'wedding', label: '결혼', Icon: Heart },
+  { value: 'funeral', label: '부고', Icon: Flower2 },
+  { value: 'birthday', label: '생일', Icon: Cake },
+  { value: 'other', label: '기타', Icon: Star },
+];
+
+function formatSheetDate(value?: string) {
+  if (!value) return '';
+  const date = new Date(`${value}T00:00:00`);
+  if (isNaN(date.getTime())) return value;
+  const weekday = new Intl.DateTimeFormat('ko-KR', { weekday: 'short' }).format(date);
+  return `${format(date, 'yyyy.MM.dd')} (${weekday})`;
+}
+
 export default function HomeTab() {
   const router = useRouter();
   const handleTossLogin = () => {
@@ -483,98 +498,131 @@ export default function HomeTab() {
         {showBottomSheet && parsedData && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowBottomSheet(false)} className="fixed inset-0 bg-black/40 z-[60]" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] max-h-[90dvh] bg-white rounded-t-[28px] px-4 py-5 sm:p-6 z-[70] shadow-2xl overflow-x-hidden flex flex-col">
-              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 shrink-0" />
-              <div className="flex items-center justify-between mb-5 shrink-0">
-                <h3 className="text-lg font-black text-gray-900">{initialParsedData ? '분석 결과 확인' : '직접 입력'}</h3>
-                <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center">{eventIcon(parsedData.eventType || 'other')}</div>
-              </div>
-
-              <div className="space-y-3 flex-1 overflow-y-auto pb-2 no-scrollbar">
-                <div className="flex bg-gray-100 p-1 rounded-xl">
-                  <button onClick={() => setParsedData({...parsedData, type: 'EXPENSE', isIncome: false})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${parsedData.type === 'EXPENSE' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-400'}`}>
-                    <ArrowUpRight size={12} /><span>보낸 마음 (OUT)</span>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] max-h-[94dvh] bg-white rounded-t-[32px] z-[70] shadow-2xl overflow-hidden flex flex-col">
+              <div className="shrink-0 border-b border-gray-100 bg-white px-5 pb-3 pt-2">
+                <div className="w-14 h-1 bg-gray-300 rounded-full mx-auto mb-3.5" />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-blue-600">
+                      <Sparkles size={12} />
+                      <span>{initialParsedData ? 'AI 분석 완료' : '직접 입력'}</span>
+                    </div>
+                    <h3 className="mt-1.5 text-[20px] leading-tight font-black tracking-tight text-gray-950">
+                      {initialParsedData ? '내용을 확인해주세요' : '내용을 입력해주세요'}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowBottomSheet(false)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-all"
+                    aria-label="닫기"
+                  >
+                    <CloseIcon size={20} />
                   </button>
-                  <button onClick={() => setParsedData({...parsedData, type: 'INCOME', isIncome: true})} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${parsedData.type === 'INCOME' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
-                    <ArrowDownLeft size={12} /><span>받은 마음 (IN)</span>
-                  </button>
-                </div>
-
-                <Field label="이름" type="contact" value={parsedData.targetName} ai={!!initialParsedData?.targetName} onChange={(v: string, cid?: string) => setParsedData({...parsedData, targetName: v, contactId: cid})} contacts={contacts} suggestedNames={(parsedData as any).suggestedNames || []} />
-                <div className="grid grid-cols-2 gap-2 min-w-0">
-                  <Field label="날짜" type="date" value={parsedData.date} ai={!!initialParsedData?.date} onChange={(v: string) => setParsedData({...parsedData, date: v})} />
-                  <Field label="종류" type="select" value={parsedData.eventType} ai={!!initialParsedData?.eventType} options={['wedding', 'funeral', 'birthday', 'other']} onChange={(v: string) => setParsedData({...parsedData, eventType: v as EventType})} />
-                </div>
-                {parsedData.eventType === 'other' && <Field label="행사명" placeholder="돌잔치, 개업식 등" value={parsedData.customEventName} onChange={(v: string) => setParsedData({...parsedData, customEventName: v})} />}
-                <Field label="장소" value={parsedData.location} ai={!!initialParsedData?.location} onChange={(v: string) => setParsedData({...parsedData, location: v})} />
-                <Field label="관계" value={parsedData.relation} onChange={(v: string) => setParsedData({...parsedData, relation: v})} />
-
-                {/* Amount */}
-                <div className={`p-4 rounded-2xl border ${initialParsedData ? 'bg-blue-50 border-blue-100' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className="flex justify-between items-center mb-2">
-                    {initialParsedData ? (
-                      <>
-                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">{parsedData.recommendationReason}</span>
-                        <span className="text-[8px] font-black text-white bg-blue-500 px-2 py-0.5 rounded-full">AI 추천</span>
-                      </>
-                    ) : (
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">금액</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <input type="text" inputMode="numeric" value={parsedData.amount ? Number(parsedData.amount).toLocaleString() : ''} onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); setParsedData({...parsedData, amount: Number(raw) || 0}); }} placeholder="0" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={`flex-1 min-w-0 bg-transparent text-2xl font-black outline-none ${initialParsedData ? 'text-blue-700' : 'text-gray-900'}`} />
-                    <span className={`text-base font-bold shrink-0 ${initialParsedData ? 'text-blue-500' : 'text-gray-500'}`}>원</span>
-                  </div>
-                  <div className="flex space-x-1.5 sm:space-x-2 mt-3">
-                    {[{ l: '-1만', d: -10000 }, { l: '+1만', d: 10000 }, { l: '+5만', d: 50000 }, { l: '+10만', d: 100000 }].map(b => (
-                      <button key={b.l} onClick={() => setParsedData({...parsedData, amount: Math.max(0, (parsedData.amount || 0) + b.d)})} className={`flex-1 py-2 bg-white/70 hover:bg-white rounded-lg text-[10px] font-bold transition-colors active:scale-95 min-w-0 border ${initialParsedData ? 'text-blue-600 border-blue-100' : 'text-gray-600 border-gray-200'}`}>{b.l}</button>
-                    ))}
-                  </div>
-                </div>
-                {/* 계좌번호 + 복사 버튼 */}
-                <div className="space-y-1 relative">
-                  <div className="flex items-center justify-between ml-0.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">계좌번호</label>
-                    {initialParsedData?.account && <span className="text-[8px] font-bold text-blue-500 flex items-center"><Sparkles size={7} className="mr-0.5" /> AI</span>}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input type="text" value={parsedData.account || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setParsedData({...parsedData, account: e.target.value})} className={`flex-1 p-3 rounded-xl text-sm font-bold outline-none border border-gray-100 ${initialParsedData?.account ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-900'}`} />
-                    {parsedData.account && parsedData.account.trim() && (
-                      <button onClick={async () => {
-                        try {
-                          await copyToClipboard(parsedData.account || '');
-                          toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
-                        } catch { toast.error('복사 실패', { duration: 2500, icon: <AlertCircle size={16} /> }); }
-                      }} className="px-3 py-3 bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 active:scale-95 transition-all shrink-0">
-                        <Copy size={12} /><span>복사</span>
-                      </button>
-                    )}
-                  </div>
-                  {/* 복수 계좌 선택 칩 */}
-                  {(() => {
-                    const accts: { account: string; label: string }[] = ((parsedData as any).suggestedAccounts || [])
-                      .map((a: any) => typeof a === 'string' ? { account: a, label: a } : { account: a.account, label: a.label || a.account })
-                      .filter((a: any) => a.account);
-                    if (accts.length <= 1) return null;
-                    return (
-                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                        {accts.map((a: { account: string; label: string }, i: number) => {
-                          const isSelected = a.account === parsedData.account;
-                          return (
-                            <button key={i} onClick={() => setParsedData({...parsedData, account: a.account})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border active:scale-95 transition-all ${isSelected ? 'bg-blue-500 text-white border-blue-500' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}>
-                              {a.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
 
-              <button onClick={() => handleSave(parsedData)} disabled={!parsedData.targetName?.trim()} className={`w-full py-4 rounded-2xl font-bold text-base mt-4 active:scale-[0.98] transition-all ${!parsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-500 text-white shadow-lg shadow-blue-200'}`}>
-                저장하기
-              </button>
+              <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-white px-3 py-2.5 space-y-2">
+                <DirectionToggle
+                  value={parsedData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
+                  onChange={(nextType) => setParsedData({...parsedData, type: nextType, isIncome: nextType === 'INCOME'})}
+                />
+
+                <Field
+                  label="이름"
+                  type="contact"
+                  value={parsedData.targetName}
+                  ai={!!initialParsedData?.targetName}
+                  tone={initialParsedData?.targetName ? 'blue' : 'gray'}
+                  onChange={(v: string, cid?: string) => setParsedData({...parsedData, targetName: v, contactId: cid})}
+                  contacts={contacts}
+                  suggestedNames={(parsedData as any).suggestedNames || []}
+                />
+
+                <ReviewDateField
+                  label="날짜"
+                  value={parsedData.date}
+                  ai={!!initialParsedData?.date}
+                  onChange={(v: string) => setParsedData({...parsedData, date: v})}
+                />
+
+                <EventTypeSelector
+                  value={(parsedData.eventType || 'other') as EventType}
+                  ai={!!initialParsedData?.eventType}
+                  initialValue={initialParsedData?.eventType as EventType | undefined}
+                  onChange={(v: EventType) => setParsedData({...parsedData, eventType: v})}
+                />
+
+                {parsedData.eventType === 'other' && (
+                  <Field
+                    label="행사명"
+                    placeholder="돌잔치, 개업식 등"
+                    value={parsedData.customEventName}
+                    ai={!!initialParsedData?.customEventName}
+                    tone={initialParsedData?.customEventName ? 'blue' : 'gray'}
+                    onChange={(v: string) => setParsedData({...parsedData, customEventName: v})}
+                  />
+                )}
+
+                <Field
+                  label="장소"
+                  value={parsedData.location}
+                  ai={!!initialParsedData?.location}
+                  tone={initialParsedData?.location ? 'blue' : 'gray'}
+                  fitToWidth
+                  minFitFontSize={12}
+                  maxFitFontSize={14}
+                  onChange={(v: string) => setParsedData({...parsedData, location: v})}
+                />
+
+                <Field
+                  label="관계"
+                  value={parsedData.relation}
+                  onChange={(v: string) => setParsedData({...parsedData, relation: v})}
+                />
+
+                <AmountReviewCard
+                  amount={parsedData.amount}
+                  reason={parsedData.recommendationReason}
+                  ai={!!initialParsedData}
+                  onChange={(amount: number) => setParsedData({...parsedData, amount})}
+                />
+
+                <AccountReviewCard
+                  account={parsedData.account || ''}
+                  ai={!!initialParsedData?.account}
+                  suggestedAccounts={(parsedData as any).suggestedAccounts || []}
+                  onChange={(account: string) => setParsedData({...parsedData, account})}
+                  onCopy={async (account: string) => {
+                    try {
+                      await copyToClipboard(account);
+                      toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
+                    } catch {
+                      toast.error('복사 실패', { duration: 2500, icon: <AlertCircle size={16} /> });
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-2.5">
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowBottomSheet(false)}
+                    className="h-12 w-20 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 active:scale-[0.98] transition-all"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(parsedData)}
+                    disabled={!parsedData.targetName?.trim()}
+                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all ${!parsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
+                  >
+                    저장하기
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </>
         )}
@@ -641,12 +689,222 @@ export default function HomeTab() {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', options = [], ai = false, contacts = [], placeholder = '', suggestedNames = [] }: any) {
+function AiPill({ children = 'AI', className = '' }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <span className={`inline-flex h-5 shrink-0 items-center justify-center rounded-md bg-blue-600 px-1.5 text-[10px] font-black text-white ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function DirectionToggle({ value, onChange }: { value: 'INCOME' | 'EXPENSE'; onChange: (value: 'INCOME' | 'EXPENSE') => void }) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-1">
+      <div className="grid grid-cols-2 gap-1">
+        <button
+          type="button"
+          onClick={() => onChange('EXPENSE')}
+          className={`flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] ${
+            value === 'EXPENSE'
+              ? 'bg-white text-red-500 shadow-sm ring-1 ring-red-100'
+              : 'text-gray-500'
+          }`}
+        >
+          <ArrowUpRight size={16} />
+          <span>보낸 마음</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('INCOME')}
+          className={`flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] ${
+            value === 'INCOME'
+              ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-100'
+              : 'text-gray-500'
+          }`}
+        >
+          <ArrowDownLeft size={16} />
+          <span>받은 마음</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReviewDateField({ label, value, ai = false, onChange }: { label: string; value?: string; ai?: boolean; onChange: (value: string) => void }) {
+  const displayValue = formatSheetDate(value);
+  return (
+    <div className={`relative rounded-2xl border px-3.5 py-3 ${ai ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50'}`}>
+      <div className="flex min-h-6 items-center gap-2.5">
+        <span className="w-9 shrink-0 text-[11px] font-black text-gray-500">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-black text-gray-950">
+          {displayValue || '날짜 선택'}
+        </span>
+        {ai && <AiPill />}
+      </div>
+      <input
+        aria-label={label}
+        type="date"
+        value={value || ''}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </div>
+  );
+}
+
+function EventTypeSelector({ value, ai = false, initialValue, onChange }: { value: EventType; ai?: boolean; initialValue?: EventType; onChange: (value: EventType) => void }) {
+  const inferredLabel = eventLabel(initialValue || value);
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+      <p className="text-[11px] font-black text-gray-500">종류</p>
+      <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+        {eventOptions.map(({ value: optionValue, label, Icon }) => {
+          const isSelected = optionValue === value;
+          return (
+            <button
+              key={optionValue}
+              type="button"
+              onClick={() => onChange(optionValue)}
+              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border bg-white text-[11px] font-black transition-all active:scale-[0.98] ${
+                isSelected
+                  ? 'border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-100'
+                  : 'border-gray-200 text-gray-500'
+              }`}
+              aria-pressed={isSelected}
+            >
+              <Icon size={17} className={isSelected ? 'text-blue-600' : 'text-gray-500'} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {ai && (
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] font-black text-blue-600">
+          <Sparkles size={11} />
+          <span>AI가 "{inferredLabel}"으로 추정</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AmountReviewCard({ amount, reason, ai = false, onChange }: { amount?: number; reason?: string; ai?: boolean; onChange: (amount: number) => void }) {
+  const value = Number(amount) || 0;
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 px-3.5 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] font-black text-blue-600">금액</p>
+        {ai && (
+          <span className="inline-flex h-6 items-center gap-1 rounded-full bg-white px-2 text-[10px] font-black text-blue-600">
+            <Sparkles size={10} />
+            추천
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex items-end gap-2 overflow-hidden">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={value ? value.toLocaleString() : ''}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^0-9]/g, '');
+            onChange(Number(raw) || 0);
+          }}
+          placeholder="0"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent text-[30px] leading-none font-black tracking-tight text-gray-950 outline-none placeholder:text-gray-300"
+        />
+        <span className="mb-0.5 shrink-0 text-[15px] font-black text-gray-500">원</span>
+      </div>
+      {reason && (
+        <p className="mt-2 text-xs leading-snug font-bold text-blue-500">"{reason}"</p>
+      )}
+      <div className="mt-3 grid grid-cols-4 gap-1.5">
+        {[{ l: '-1만', d: -10000 }, { l: '+1만', d: 10000 }, { l: '+5만', d: 50000 }, { l: '+10만', d: 100000 }].map((button) => (
+          <button
+            key={button.l}
+            type="button"
+            onClick={() => onChange(Math.max(0, value + button.d))}
+            className="h-9 min-w-0 rounded-xl border border-blue-200 bg-white text-xs font-black text-blue-700 transition-all active:scale-[0.98]"
+          >
+            {button.l}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChange, onCopy }: { account: string; ai?: boolean; suggestedAccounts?: any[]; onChange: (account: string) => void; onCopy: (account: string) => Promise<void> }) {
+  const accounts: { account: string; label: string }[] = suggestedAccounts
+    .map((item: any) => typeof item === 'string' ? { account: item, label: item } : { account: item.account, label: item.label || item.account })
+    .filter((item: any) => item.account);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-black text-gray-500">계좌번호</p>
+        {ai && <AiPill />}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="text"
+          value={account}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+          placeholder="은행 계좌번호 예금주"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 bg-transparent text-[13px] font-black text-gray-950 outline-none placeholder:text-gray-300"
+        />
+        {account.trim() && (
+          <button
+            type="button"
+            onClick={() => onCopy(account)}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-black text-gray-700 transition-all active:scale-95"
+          >
+            <Copy size={16} />
+            <span>복사</span>
+          </button>
+        )}
+      </div>
+      {accounts.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {accounts.map((item, index) => {
+            const isSelected = item.account === account;
+            return (
+              <button
+                key={`${item.account}-${index}`}
+                type="button"
+                onClick={() => onChange(item.account)}
+                className={`rounded-xl border px-3 py-2 text-xs font-black transition-all active:scale-95 ${
+                  isSelected
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-blue-100 bg-white text-blue-600'
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', options = [], ai = false, contacts = [], placeholder = '', suggestedNames = [], tone, fitToWidth = false, minFitFontSize = 12, maxFitFontSize = 14 }: any) {
   const [show, setShow] = useState(false);
   // Local state + DOM ref to prevent Korean IME composition leaking across fields
   const [localValue, setLocalValue] = useState(value ?? '');
+  const [fitFontSize, setFitFontSize] = useState<number | null>(null);
+  const [fitRows, setFitRows] = useState(1);
   const composingRef = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   // Sync from parent (AI suggestions, chip clicks, etc.) — skip during composition
   React.useEffect(() => {
@@ -669,13 +927,13 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
   }, [value]);
 
   const handleCompositionStart = useCallback(() => { composingRef.current = true; }, []);
-  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     composingRef.current = false;
     const v = e.currentTarget.value;
     setLocalValue(v);
     onChange(v);
   }, [onChange]);
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const v = e.target.value;
     setLocalValue(v);
     if (!composingRef.current) {
@@ -688,45 +946,107 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
     .map((s: any) => typeof s === 'string' ? { name: s, label: s } : { name: s.name, label: s.label || s.name })
     .filter((s: any) => s.name);
   const contactSuggestions = contacts.filter((c: any) => c.name.toLowerCase().includes((localValue || '').toLowerCase()));
+  const isBlue = tone ? tone === 'blue' : ai;
+  const fieldClass = isBlue ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50';
+  const inputClass = 'min-w-0 flex-1 bg-transparent text-sm font-black leading-snug text-gray-950 outline-none placeholder:text-gray-300';
+  const shouldAutoFit = fitToWidth && type === 'text';
+
+  React.useLayoutEffect(() => {
+    if (!shouldAutoFit) return;
+    const element = inputRef.current;
+    if (!element || typeof window === 'undefined') return;
+
+    const fit = () => {
+      const text = String(element.value || placeholder || '');
+      if (!text.trim()) {
+        setFitFontSize(null);
+        setFitRows(1);
+        return;
+      }
+
+      const availableWidth = element.clientWidth;
+      if (availableWidth <= 0) return;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const computed = window.getComputedStyle(element);
+      ctx.font = `${computed.fontStyle} ${computed.fontVariant} ${computed.fontWeight} ${maxFitFontSize}px ${computed.fontFamily}`;
+      const measuredWidth = ctx.measureText(text).width;
+      const nextFontSize = measuredWidth > availableWidth
+        ? Math.max(minFitFontSize, Math.floor((availableWidth / measuredWidth) * maxFitFontSize * 10) / 10)
+        : maxFitFontSize;
+      const minWidth = measuredWidth * (minFitFontSize / maxFitFontSize);
+
+      setFitFontSize(nextFontSize);
+      setFitRows(nextFontSize <= minFitFontSize + 0.1 && minWidth > availableWidth ? 2 : 1);
+    };
+
+    fit();
+    const resizeObserver = new ResizeObserver(fit);
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, [shouldAutoFit, localValue, value, placeholder, minFitFontSize, maxFitFontSize]);
 
   return (
-    <div className="space-y-1 relative">
-      <div className="flex items-center justify-between ml-0.5">
-        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{label}</label>
-        {ai && <span className="text-[8px] font-bold text-blue-500 flex items-center"><Sparkles size={7} className="mr-0.5" /> AI</span>}
-      </div>
+    <div className="relative">
+      <div className={`rounded-2xl border px-3.5 py-3 ${fieldClass}`}>
+        <div className="flex min-h-6 items-center gap-2.5">
+          <label className="w-9 shrink-0 text-[11px] font-black text-gray-500">{label}</label>
       {type === 'select' ? (
-        <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`w-full p-3 rounded-xl text-sm font-bold outline-none border border-gray-100 ${ai ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-900'}`}>
+            <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
           {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
         </select>
       ) : type === 'contact' ? (
-        <div className="relative">
-          <input ref={inputRef} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={`w-full p-3 rounded-xl text-sm font-bold outline-none border border-gray-100 ${ai ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-900'}`} />
-          {/* AI 제안 이름 칩 — 모두 표시, 선택된 항목 하이라이트 */}
-          {normalizedSuggestions.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {normalizedSuggestions.map((s: { name: string; label: string }, i: number) => {
-                const isSelected = s.name === value;
-                return (
-                  <button key={i} onClick={() => onChange(s.name)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border active:scale-95 transition-all ${isSelected ? 'bg-blue-500 text-white border-blue-500' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}>
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {show && contactSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-50 max-h-40 overflow-y-auto">
-              {contactSuggestions.map((c: any) => (
-                <button key={c.id} onClick={() => onChange(c.name, c.id)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 font-medium">{c.name} <span className="text-[10px] text-gray-400 ml-1">{c.relation}</span></button>
-              ))}
-            </div>
-          )}
-        </div>
+            <input ref={(node) => { inputRef.current = node; }} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
       ) : type === 'date' ? (
-        <input type="date" value={value || ''} placeholder="yyyy-MM-dd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)} className={`w-full p-3 rounded-xl text-sm font-bold outline-none border border-gray-100 appearance-none min-w-0 ${ai ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-900'}`} />
+            <input type="date" value={value || ''} placeholder="yyyy-MM-dd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`} />
+      ) : shouldAutoFit ? (
+            <textarea ref={(node) => { inputRef.current = node; }} rows={fitRows} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} style={{ fontSize: `${fitFontSize ?? maxFitFontSize}px` }} className={`${inputClass} resize-none overflow-hidden`} />
       ) : (
-        <input ref={inputRef} type={type} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={`w-full p-3 rounded-xl text-sm font-bold outline-none border border-gray-100 ${ai ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-900'}`} />
+            <input ref={(node) => { inputRef.current = node; }} type={type} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
+      )}
+          {ai && <AiPill />}
+        </div>
+
+        {type === 'contact' && normalizedSuggestions.length > 1 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {normalizedSuggestions.map((suggestion: { name: string; label: string }, index: number) => {
+              const isSelected = suggestion.name === value;
+              return (
+                <button
+                  key={`${suggestion.name}-${index}`}
+                  type="button"
+                  onClick={() => onChange(suggestion.name)}
+                  className={`rounded-lg border px-2 py-1.5 text-[11px] font-black transition-all active:scale-95 ${
+                    isSelected
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-blue-100 bg-white text-blue-600'
+                  }`}
+                >
+                  {suggestion.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {type === 'contact' && show && contactSuggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-44 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-lg">
+          {contactSuggestions.map((contact: any) => (
+            <button
+              key={contact.id}
+              type="button"
+              onClick={() => onChange(contact.name, contact.id)}
+              className="w-full px-5 py-3 text-left text-sm font-bold text-gray-800 hover:bg-gray-50"
+            >
+              {contact.name}
+              <span className="ml-1 text-[11px] font-bold text-gray-400">{contact.relation}</span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
