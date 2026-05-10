@@ -10,6 +10,14 @@
       "access": "write"
     },
     {
+      "name": "photos",
+      "access": "read"
+    },
+    {
+      "name": "camera",
+      "access": "access"
+    },
+    {
       "name": "contacts",
       "access": "read"
     }
