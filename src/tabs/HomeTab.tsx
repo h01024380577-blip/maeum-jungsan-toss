@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
-import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Upload, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, LogIn, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, EventEntry, EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -81,7 +81,10 @@ async function copyToClipboard(text: string): Promise<void> {
   // 앱인토스 환경
   if (isAppsInToss()) {
     const { setClipboardText } = await import('@apps-in-toss/web-framework');
-    await (setClipboardText as any)(text);
+    if (!(await ensureTossPermission(setClipboardText))) {
+      throw new Error('clipboard_permission_denied');
+    }
+    await setClipboardText(text);
     return;
   }
   // HTTPS 환경
@@ -108,6 +111,20 @@ function isAppsInToss(): boolean {
     window.navigator.userAgent.includes('TossApp');
 }
 
+type TossPermissionStatus = 'notDetermined' | 'denied' | 'allowed';
+type TossPermissionFunction = {
+  getPermission?: () => Promise<TossPermissionStatus>;
+  openPermissionDialog?: () => Promise<TossPermissionStatus>;
+};
+
+async function ensureTossPermission(fn: TossPermissionFunction): Promise<boolean> {
+  const current = await fn.getPermission?.().catch(() => null);
+  if (!current || current === 'allowed') return true;
+  if (current === 'denied') return false;
+  const next = await fn.openPermissionDialog?.().catch(() => null);
+  return next === 'allowed';
+}
+
 const eventIcon = (t: string, size = 14) => {
   if (t === 'wedding') return <Heart size={size} className="text-pink-500 fill-pink-500" />;
   if (t === 'funeral') return <Flower2 size={size} className="text-gray-400" />;
@@ -132,14 +149,47 @@ function formatSheetDate(value?: string) {
   return `${format(date, 'yyyy.MM.dd')} (${weekday})`;
 }
 
+function formatMan(value: number) {
+  return `${Math.round(Math.abs(value) / 10000)}만`;
+}
+
+function formatSignedMan(value: number) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${formatMan(value)}`;
+}
+
+function formatEntryDate(value?: string) {
+  if (!value) return '';
+  try {
+    const date = parseISO(value);
+    if (isNaN(date.getTime())) return value;
+    return format(date, 'M월 d일');
+  } catch {
+    return value;
+  }
+}
+
+function isLikelyUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+  try {
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const url = new URL(candidate);
+    return url.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
 export default function HomeTab() {
   const router = useRouter();
   const handleTossLogin = () => {
     router.push('/intro');
   };
-  const { entries, addEntry, addFeedback, contacts, loadFromSupabase, tossUserId, refreshCredits } = useStore();
+  const { entries, addEntry, addFeedback, contacts, loadFromSupabase, tossUserId, tossUserName, refreshCredits } = useStore();
   const [inputText, setInputText] = useState('');
   const [inputUrl, setInputUrl] = useState('');
+  const [inputMode, setInputMode] = useState<'text' | 'url'>('text');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [adPromptOpen, setAdPromptOpen] = useState(false);
@@ -148,36 +198,20 @@ export default function HomeTab() {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [savedAccount, setSavedAccount] = useState('');
-  const [lastClipboardText, setLastClipboardText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-
-  React.useEffect(() => {
-    const check = async () => {
-      try {
-        if (document.visibilityState !== 'visible') return;
-        let text = '';
-        if (isAppsInToss()) {
-          const { getClipboardText } = await import('@apps-in-toss/web-framework');
-          text = await getClipboardText();
-        } else {
-          text = await navigator.clipboard.readText();
-        }
-        if (text && text !== lastClipboardText && text.length > 10) {
-          if (['결혼', '부고', '장례', '초대', '모십니다', '축하'].some(k => text.includes(k))) {
-            setLastClipboardText(text); setInputText(text);
-            // 자동 파싱 제거 - 사용자가 직접 분석 버튼을 누르도록 변경
-          }
-        }
-      } catch {}
-    };
-    window.addEventListener('focus', check);
-    return () => window.removeEventListener('focus', check);
-  }, [lastClipboardText]);
-
-  const totalGiven = entries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
-  const totalReceived = entries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
-  const balance = totalReceived - totalGiven;
+  const now = new Date();
+  const monthEntries = entries.filter((entry) => {
+    try {
+      const date = parseISO(entry.date);
+      return !isNaN(date.getTime()) && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    } catch {
+      return false;
+    }
+  });
+  const monthGiven = monthEntries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
+  const monthReceived = monthEntries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
+  const monthBalance = monthReceived - monthGiven;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -190,16 +224,32 @@ export default function HomeTab() {
 
   const handleCameraCapture = async () => {
     if (!isAppsInToss()) { fileInputRef.current?.click(); return; }
-    const { openCamera } = await import('@apps-in-toss/web-framework');
-    const r: any = await openCamera();
-    if (r?.base64) { const d = `data:image/jpeg;base64,${r.base64}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+    try {
+      const { openCamera } = await import('@apps-in-toss/web-framework');
+      if (!(await ensureTossPermission(openCamera))) {
+        toast.error('카메라 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+        return;
+      }
+      const r: any = await openCamera();
+      if (r?.base64) { const d = `data:image/jpeg;base64,${r.base64}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+    } catch {
+      toast.error('카메라를 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+    }
   };
 
   const handleAlbumSelect = async () => {
     if (!isAppsInToss()) { fileInputRef.current?.click(); return; }
-    const { fetchAlbumPhotos } = await import('@apps-in-toss/web-framework');
-    const r: any = await (fetchAlbumPhotos as any)({ maxCount: 1, base64: true });
-    if (r?.[0]?.dataUri) { const d = `data:image/jpeg;base64,${r[0].dataUri}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+    try {
+      const { fetchAlbumPhotos } = await import('@apps-in-toss/web-framework');
+      if (!(await ensureTossPermission(fetchAlbumPhotos))) {
+        toast.error('사진 접근 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+        return;
+      }
+      const r: any = await fetchAlbumPhotos({ maxCount: 1, base64: true });
+      if (r?.[0]?.dataUri) { const d = `data:image/jpeg;base64,${r[0].dataUri}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+    } catch {
+      toast.error('앨범을 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+    }
   };
 
   const handleParse = async (params?: { type: 'text' | 'url' | 'image'; data: string } | string) => {
@@ -282,8 +332,8 @@ export default function HomeTab() {
   };
 
   const handleManualEntry = () => {
-    const d: any = { targetName: '', date: format(new Date(), 'yyyy-MM-dd'), eventType: 'wedding', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false };
-    setInputText(''); setInputUrl(''); setSelectedImage(null);
+    const d: any = { targetName: '', date: '', eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false };
+    setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null);
     setParsedData(d); setInitialParsedData(null); setShowBottomSheet(true);
   };
 
@@ -293,7 +343,7 @@ export default function HomeTab() {
     try {
       await addEntry({
         contactId: fd.contactId, eventType: ['wedding', 'funeral', 'birthday', 'other'].includes(fd.eventType) ? fd.eventType : 'other',
-        type: fd.isIncome ? 'INCOME' : 'EXPENSE', date: fd.date, location: fd.location || '', targetName: fd.targetName || '',
+        type: fd.isIncome ? 'INCOME' : 'EXPENSE', date: fd.date || format(new Date(), 'yyyy-MM-dd'), location: fd.location || '', targetName: fd.targetName || '',
         amount: Number(fd.amount) || 0, relation: fd.relation || '', isIncome: !!fd.isIncome, memo: fd.memo || '',
         account: fd.account || '', recommendationReason: fd.recommendationReason || '', customEventName: fd.customEventName || '',
       });
@@ -308,7 +358,7 @@ export default function HomeTab() {
         setSavedAccount(fd.account);
         setShowTransferModal(true);
       }
-      setShowBottomSheet(false); setInputText(''); setInputUrl(''); setSelectedImage(null); setParsedData(null); setInitialParsedData(null);
+      setShowBottomSheet(false); setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null); setParsedData(null); setInitialParsedData(null);
     } catch (err: any) {
       console.error('Save failed:', err);
       toast.error(`저장 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
@@ -316,181 +366,199 @@ export default function HomeTab() {
   };
 
   const recentEntries = entries.slice(0, 3);
+  const activeInputValue = inputMode === 'url' ? inputUrl : inputText;
+  const greetingName = tossUserName?.trim() ? `${tossUserName.trim().replace(/님$/, '')}님` : '손님';
+  const canAnalyzeInput = activeInputValue.trim().length > 0 && !isParsing;
+  const handleUrlMode = () => {
+    if (inputMode === 'url') {
+      setInputMode('text');
+      return;
+    }
+    const candidate = inputText.trim();
+    setInputUrl(isLikelyUrl(candidate) ? candidate : '');
+    setInputMode('url');
+    setSelectedImage(null);
+  };
+  const handlePrimaryAnalyze = () => {
+    const data = activeInputValue.trim();
+    if (!data) return;
+    handleParse({ type: inputMode === 'url' ? 'url' : 'text', data });
+  };
 
   return (
-    <div className="pb-4">
-      {/* Header — 프로필은 MY 탭으로 이관. 비로그인만 로그인 CTA 노출 */}
-      <div className="px-5 pt-14 pb-6 bg-white">
-        {!tossUserId && (
-          <div className="flex items-center mb-8">
+    <div className="pb-5">
+      <div className="px-5 pt-8 pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/icon.png"
+              alt="마음정산"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-[14px] shadow-sm"
+            />
+            <div>
+              <h2 className="text-[17px] font-black leading-tight text-gray-950">마음정산</h2>
+            </div>
+          </div>
+          {!tossUserId && (
             <button
               type="button"
               onClick={handleTossLogin}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shrink-0 shadow-sm shadow-blue-100 active:scale-[0.97] transition-all"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-gray-950 px-3.5 text-[12px] font-bold text-white active:scale-[0.97] transition-all"
             >
-              <LogIn size={13} />
-              <span>토스 로그인</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span>토스로 로그인</span>
             </button>
-          </div>
-        )}
-
-        {/* Hero Title */}
-        <div className="text-center mb-6">
-          <img
-            src="/icon.png"
-            alt="마음정산"
-            width={64}
-            height={64}
-            className="mx-auto mb-3 rounded-2xl shadow-sm"
-          />
-          <h2 className="text-[28px] font-black text-gray-900 tracking-tight">마음정산 AI</h2>
-          <p className="text-sm text-gray-400 mt-1">링크나 이미지만으로 경조사 정보를 자동 입력하세요</p>
+          )}
         </div>
 
-        {/* Summary Cards — 내역이 없어도 프레임은 유지하고 0으로 표시 */}
-        <div className="grid grid-cols-3 gap-2.5 mb-2">
-          <div className="bg-blue-50 rounded-2xl p-3 text-center">
-            <div className="flex items-center justify-center space-x-1 mb-1">
-              <ArrowDownLeft size={11} className="text-blue-500" />
-              <span className="text-[9px] font-bold text-blue-400 uppercase">받은 마음</span>
-            </div>
-            <p className="text-base font-black text-blue-600">{(totalReceived / 10000).toFixed(0)}<span className="text-[10px] font-bold text-blue-400">만</span></p>
-          </div>
-          <div className="bg-red-50 rounded-2xl p-3 text-center">
-            <div className="flex items-center justify-center space-x-1 mb-1">
-              <ArrowUpRight size={11} className="text-red-400" />
-              <span className="text-[9px] font-bold text-red-400 uppercase">보낸 마음</span>
-            </div>
-            <p className="text-base font-black text-red-500">{(totalGiven / 10000).toFixed(0)}<span className="text-[10px] font-bold text-red-400">만</span></p>
-          </div>
-          <div className="bg-gray-50 rounded-2xl p-3 text-center border border-gray-100">
-            <div className="flex items-center justify-center space-x-1 mb-1">
-              <Wallet size={11} className="text-gray-400" />
-              <span className="text-[9px] font-bold text-gray-400 uppercase">합계</span>
-            </div>
-            <p className={`text-base font-black ${balance >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{balance >= 0 ? '+' : ''}{(balance / 10000).toFixed(0)}<span className="text-[10px] font-bold text-gray-400">만</span></p>
-          </div>
-        </div>
-      </div>
-
-      {/* Input Section */}
-      <div className="px-5 pt-4 space-y-3">
-        {/* URL Input Card */}
-        <div className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100 space-y-3.5">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-              <LinkIcon size={16} className="text-blue-500" />
-            </div>
-            <span className="text-sm font-bold text-gray-800">링크 업로드</span>
-          </div>
-          <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2.5">
-            <input
-              type="text" value={inputUrl} onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="https://mcard.kakao.com/..."
-              className="min-w-0 flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-gray-300 border border-gray-100"
-            />
-            <button
-              onClick={() => handleParse({ type: 'url', data: inputUrl })}
-              disabled={isParsing || !inputUrl.trim()}
-              className={`shrink-0 px-4 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 flex items-center justify-center space-x-1.5 whitespace-nowrap ${
-                isParsing || !inputUrl.trim() ? 'bg-gray-100 text-gray-300 border border-gray-100' : 'bg-blue-500 text-white shadow-md shadow-blue-200'
-              }`}
-            >
-              {isParsing && inputUrl.trim() ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Sparkles size={14} /><span>분석하기</span></>}
-            </button>
-          </div>
+        <div className="mt-6">
+          <p className="text-[14px] font-bold text-blue-500">안녕하세요, {greetingName}</p>
+          <h1 className="mt-2.5 text-[24px] leading-[1.18] font-black tracking-tight text-gray-950">
+            어떤 마음을 정산할까요?
+          </h1>
+          <p className="mt-3.5 text-[13px] leading-relaxed font-semibold text-gray-500">
+            링크·이미지·메시지를 붙여넣으면 <span className="text-blue-500">AI</span>가 자동으로 정리해드려요.
+          </p>
         </div>
 
-        {/* Image Upload Card */}
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="bg-white rounded-[24px] p-8 shadow-sm border-2 border-dashed border-gray-200 flex flex-col items-center justify-center space-y-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all cursor-pointer group"
-        >
+        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           {selectedImage ? (
-            <div className="flex flex-col items-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl overflow-hidden animate-pulse">
-                <img src="/ai-loading-icon.png" alt="AI 분석 중" className="w-full h-full object-cover" />
+            <div className="flex min-h-[64px] items-center gap-3">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse">
+                <img src="/ai-loading-icon.png" alt="AI 분석 중" className="h-full w-full object-cover" />
               </div>
-              <p className="text-sm font-bold text-blue-600">이미지 분석 중...</p>
-              <p className="text-[11px] text-blue-400">잠시만 기다려 주세요</p>
+              <div>
+                <p className="text-[13px] font-black text-blue-600">이미지 분석 중...</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-blue-400">잠시만 기다려 주세요</p>
+              </div>
             </div>
           ) : (
-            <>
-              <div className="w-16 h-16 bg-blue-50 text-blue-400 rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                <ImageIcon size={32} />
-              </div>
-              <div className="text-center">
-                <p className="text-base font-black text-gray-800">이미지 업로드</p>
-                <p className="text-xs text-gray-400 mt-1">여기를 클릭하거나 이미지를 드래그하여 업로드</p>
-              </div>
-              <div className="flex items-center space-x-1.5 text-[9px] font-bold text-gray-400 bg-gray-50 px-3.5 py-1.5 rounded-full tracking-wider">
-                <Upload size={10} />
-                <span>이미지 업로드</span>
-              </div>
-            </>
+            <textarea
+              value={activeInputValue}
+              onChange={(event) => {
+                if (inputMode === 'url') setInputUrl(event.target.value);
+                else setInputText(event.target.value);
+              }}
+              placeholder={inputMode === 'url' ? '초대장 URL을 붙여넣으세요...' : '이미지 또는 메시지를 입력하세요...'}
+              className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+            />
           )}
-          <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-        </div>
 
-        {/* Text Input Card */}
-        <div className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center">
-                <Send size={16} className="text-gray-400" />
-              </div>
-              <span className="text-sm font-bold text-gray-800">텍스트 붙여넣기</span>
-            </div>
-            {inputText && <button onClick={() => setInputText('')} className="text-gray-300 hover:text-gray-500"><CloseIcon size={14} /></button>}
-          </div>
-          <textarea
-            value={inputText} onChange={(e) => setInputText(e.target.value)}
-            placeholder="텍스트를 붙여넣으세요..."
-            className="w-full h-20 p-3.5 bg-gray-50 rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 resize-none transition-all placeholder:text-gray-300 border border-gray-100"
-          />
-          {inputText.trim() && (
-            <button onClick={() => handleParse({ type: 'text', data: inputText })} disabled={isParsing} className="w-full py-3.5 bg-gray-900 text-white rounded-xl font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center space-x-2">
-              {isParsing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Sparkles size={14} className="text-blue-400" /><span>텍스트 분석하기</span></>}
+          <div className="mt-3 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleCameraCapture}
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-1 text-[11px] font-black text-blue-600 active:scale-95 transition-all"
+            >
+              <Camera size={14} />
+              <span>카메라</span>
             </button>
-          )}
+            <button
+              type="button"
+              onClick={handleAlbumSelect}
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all"
+            >
+              <ImageIcon size={14} />
+              <span>앨범</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleUrlMode}
+              className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black active:scale-95 transition-all ${inputMode === 'url' ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}`}
+            >
+              <LinkIcon size={14} />
+              <span>URL</span>
+            </button>
+            <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+            <button
+              type="button"
+              onClick={handleManualEntry}
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all"
+            >
+              <Plus size={14} />
+              <span>직접</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrimaryAnalyze}
+              disabled={!canAnalyzeInput}
+              className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
+                canAnalyzeInput ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-gray-200 text-gray-400'
+              }`}
+              aria-label="AI 분석"
+            >
+              {isParsing ? <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Send size={16} />}
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+          </div>
         </div>
 
-        {/* Manual Entry */}
-        <button onClick={handleManualEntry} className="w-full bg-white rounded-[24px] p-4 shadow-sm border border-gray-100 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gray-50 text-gray-400 rounded-xl flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
-              <Plus size={20} />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-bold text-gray-800">직접 입력하기</p>
-              <p className="text-[11px] text-gray-400">AI 분석 없이 모든 정보를 직접 입력</p>
-            </div>
-          </div>
-          <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
-        </button>
+      </div>
 
-        {/* Recent Activity */}
-        {recentEntries.length > 0 && (
-          <div className="pt-3 space-y-2.5">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">최근 내역</h3>
-            {recentEntries.map(e => (
-              <div key={e.id} className="bg-white px-4 py-3 rounded-2xl border border-gray-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${e.type === 'INCOME' ? 'bg-blue-50' : 'bg-red-50'}`}>
-                    {eventIcon(e.eventType)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{e.targetName}</p>
-                    <p className="text-[10px] text-gray-400">{eventLabel(e.eventType)}</p>
-                  </div>
-                </div>
-                <p className={`text-sm font-black ${e.type === 'INCOME' ? 'text-blue-600' : 'text-red-500'}`}>
-                  {e.type === 'INCOME' ? '+' : '-'}{e.amount.toLocaleString()}
-                </p>
-              </div>
-            ))}
+      <div className="px-5 space-y-6">
+        <section>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h3 className="text-[14px] font-black text-gray-800">
+              <span className="text-blue-600">이번 달</span> 마음정산
+            </h3>
+            <button
+              type="button"
+              onClick={() => router.push('/stats')}
+              className="flex items-center gap-0.5 text-[12px] font-bold text-gray-400 active:scale-95 transition-all"
+            >
+              <span>전체 통계</span>
+              <ChevronRight size={13} />
+            </button>
           </div>
-        )}
+          <div className="grid grid-cols-3 gap-2.5">
+            <SummaryTile
+              label="받은 마음"
+              value={formatMan(monthReceived)}
+              suffix=""
+              tone="blue"
+            />
+            <SummaryTile
+              label="보낸 마음"
+              value={formatMan(monthGiven)}
+              suffix=""
+              tone="red"
+            />
+            <SummaryTile
+              label="합계"
+              value={formatSignedMan(monthBalance)}
+              suffix=""
+              tone={monthBalance >= 0 ? 'blue' : 'red'}
+            />
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h3 className="text-[14px] font-black text-gray-800">최근 내역</h3>
+            <button
+              type="button"
+              onClick={() => router.push('/history')}
+              className="flex items-center gap-0.5 text-[12px] font-bold text-gray-400 active:scale-95 transition-all"
+            >
+              <span>모두 보기</span>
+              <ChevronRight size={13} />
+            </button>
+          </div>
+          {recentEntries.length > 0 ? (
+            <div className="overflow-hidden rounded-[20px] bg-white shadow-sm border border-gray-100">
+              {recentEntries.map((entry, index) => (
+                <RecentEntryRow key={entry.id} entry={entry} isLast={index === recentEntries.length - 1} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-dashed border-gray-200 bg-white px-5 py-6 text-center">
+              <p className="text-[13px] font-bold text-gray-500">아직 기록된 마음이 없어요</p>
+              <p className="mt-1 text-[11px] text-gray-400">링크·이미지·메시지로 첫 기록을 남겨보세요</p>
+            </div>
+          )}
+        </section>
       </div>
 
       {/* Bottom Sheet */}
@@ -685,6 +753,45 @@ export default function HomeTab() {
         onClose={() => setAdPromptOpen(false)}
         rewardType="AI_CREDIT"
       />
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, suffix, tone }: { label: string; value: string; suffix: string; tone: 'blue' | 'red' }) {
+  const toneClass = tone === 'blue'
+    ? { text: 'text-blue-600' }
+    : { text: 'text-red-500' };
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+      <p className="truncate text-[10px] font-bold text-gray-400">{label}</p>
+      <p className={`mt-2.5 whitespace-nowrap text-[17px] leading-none font-black tracking-tight ${toneClass.text}`}>
+        {value}<span className="text-[10px] font-bold text-gray-500">{suffix}</span>
+      </p>
+    </div>
+  );
+}
+
+function RecentEntryRow({ entry, isLast }: { entry: EventEntry; isLast: boolean }) {
+  const isIncome = entry.type === 'INCOME';
+  const amountLabel = `${isIncome ? '+' : '-'}${formatMan(entry.amount)}`;
+  const detailLabel = entry.eventType === 'other' && entry.customEventName ? entry.customEventName : eventLabel(entry.eventType);
+
+  return (
+    <div className={`flex items-center justify-between gap-3 px-4 py-3.5 ${!isLast ? 'border-b border-gray-100' : ''}`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isIncome ? 'bg-blue-50' : 'bg-red-50'}`}>
+          {eventIcon(entry.eventType, 14)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold leading-tight text-gray-900">{entry.targetName || '이름 없음'}</p>
+          <p className="mt-0.5 truncate text-[10px] font-medium text-gray-400">{detailLabel} · {formatEntryDate(entry.date)}</p>
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className={`text-sm font-black leading-tight ${isIncome ? 'text-blue-600' : 'text-red-500'}`}>{amountLabel}</p>
+        <p className="mt-0.5 text-[9px] font-medium text-gray-300">{isIncome ? '받음' : '보냄'}</p>
+      </div>
     </div>
   );
 }

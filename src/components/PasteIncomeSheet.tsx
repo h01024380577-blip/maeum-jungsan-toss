@@ -43,7 +43,26 @@ function isAppsInToss(): boolean {
 async function readClipboard(): Promise<string> {
   if (isAppsInToss()) {
     const { getClipboardText } = await import('@apps-in-toss/web-framework');
+    const currentPermission = await getClipboardText.getPermission().catch(() => null);
+    if (currentPermission === 'denied') {
+      throw new Error('clipboard_permission_denied');
+    }
+    if (currentPermission === 'notDetermined') {
+      const nextPermission = await getClipboardText.openPermissionDialog().catch(() => null);
+      if (nextPermission !== 'allowed') {
+        throw new Error('clipboard_permission_denied');
+      }
+    }
     return await getClipboardText();
+  }
+  if (!navigator.clipboard || !window.isSecureContext) {
+    throw new Error('clipboard_unavailable');
+  }
+  const permission = await navigator.permissions
+    ?.query({ name: 'clipboard-read' as PermissionName })
+    .catch(() => null);
+  if (permission?.state === 'denied') {
+    throw new Error('clipboard_permission_denied');
   }
   return await navigator.clipboard.readText();
 }

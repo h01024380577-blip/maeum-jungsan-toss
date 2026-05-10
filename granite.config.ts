@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: '마음정산',
     primaryColor: '#3B82F6',
-    icon: 'http://3.37.76.233:3000/icon.png',
+    icon: 'http://3.238.129.126:3000/icon.png',
   },
   web: {
     host: 'localhost',
@@ -21,6 +21,8 @@ export default defineConfig({
   permissions: [
     { name: 'clipboard', access: 'read' },
     { name: 'clipboard', access: 'write' },
+    { name: 'photos', access: 'read' },
+    { name: 'camera', access: 'access' },
     { name: 'contacts', access: 'read' },
   ] as any,
 });
