@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { resolveDbUserId } from '@/src/lib/credits';
 import { corsResponse, withCors } from '@/src/lib/cors';
+import { normalizeImportMemo } from '@/src/lib/memoSanitization';
 
 const VALID_SOURCES = ['MANUAL', 'URL', 'OCR', 'SMS_PASTE', 'CSV'] as const;
 type TransactionSourceValue = (typeof VALID_SOURCES)[number];
@@ -62,8 +63,9 @@ export async function POST(req: NextRequest) {
       const existing = await tx.contact.findFirst({ where: { userId, name: body.targetName } });
       contactId = existing ? existing.id : (await tx.contact.create({ data: { userId, name: body.targetName, relation: body.relation || '지인' } })).id;
     }
-    const event = await tx.event.create({ data: { userId, contactId, eventType: body.eventType.toUpperCase(), targetName: body.targetName, date: new Date(body.date), location: body.location ?? '', relation: body.relation ?? '', memo: body.memo ?? '', account: body.account ?? '', customEventName: body.customEventName ?? null } });
     const source = normalizeSource(body.source);
+    const memo = source === 'SMS_PASTE' ? normalizeImportMemo(body.memo) : (body.memo ?? '');
+    const event = await tx.event.create({ data: { userId, contactId, eventType: body.eventType.toUpperCase(), targetName: body.targetName, date: new Date(body.date), location: body.location ?? '', relation: body.relation ?? '', memo, account: body.account ?? '', customEventName: body.customEventName ?? null } });
     const transaction = await tx.transaction.create({ data: { eventId: event.id, userId, type: body.type ?? 'EXPENSE', amount: Number(body.amount) || 0, account: body.account ?? '', relation: body.relation ?? '', recommendationReason: body.recommendationReason ?? '', ...(source ? { source } : {}) } });
     let contact = null;
     if (contactId) {

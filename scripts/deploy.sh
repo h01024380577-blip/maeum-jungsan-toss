@@ -16,7 +16,7 @@ git push aws main
 # npm install: package-lock 변경(신규 의존성) 대응. 변경 없으면 빠르게 패스.
 # pm2 --update-env: .env 파일 변경도 프로세스에 반영되도록 강제.
 echo "🖥️  Updating EC2 server..."
-ssh "$EC2_HOST" "cd $EC2_DIR && git pull origin main && npm install --legacy-peer-deps 2>&1 | tail -3 && set -a && source .env && set +a && npx prisma db execute --file prisma/manual-migrations/2026-05-11_add_event_import_fingerprint.sql --url \"\$DIRECT_URL\" && npx prisma generate && npm run build:next 2>&1 | tail -3 && pm2 restart maeum-jungsan --update-env"
+ssh "$EC2_HOST" "cd $EC2_DIR && git pull origin main && npm install --legacy-peer-deps 2>&1 | tail -3 && set -a && source .env && set +a && npx prisma db execute --file prisma/manual-migrations/2026-05-11_add_event_import_fingerprint.sql --url \"\$DIRECT_URL\" && npx prisma db execute --file prisma/manual-migrations/2026-05-11_clear_generated_import_memos.sql --url \"\$DIRECT_URL\" && npx prisma generate && npm run build:next 2>&1 | tail -3 && pm2 restart maeum-jungsan --update-env"
 
 # --- 2.5. Smoke test: 새 배포가 정상 부팅됐는지 확인 ---
 # /api/health 가 env validation + DB ping 검증 → 200 또는 503.

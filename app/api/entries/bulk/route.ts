@@ -17,6 +17,7 @@ import {
   type BulkEventType,
   type BulkTransactionType,
 } from '@/src/lib/bulkEntryDedup';
+import { normalizeImportMemo } from '@/src/lib/memoSanitization';
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req);
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       location: String(raw.location ?? '').trim() || '기타',
       relation: String(raw.relation ?? '').trim() || '지인',
       type,
-      memo: String(raw.memo ?? '').trim(),
+      memo: normalizeImportMemo(raw.memo),
       account: String(raw.account ?? ''),
     };
     entries.push({
