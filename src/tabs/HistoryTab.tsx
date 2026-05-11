@@ -48,7 +48,7 @@ export default function HistoryTab() {
       if (via === 'ait-openurl') {
         toast.success(`${filename} (${rowCount}행)`, {
           description: '브라우저가 열리면 다운로드 받기를 눌러주세요. 1시간 내 유효',
-          duration: 7000,
+          duration: 3500,
         });
       } else {
         toast.success(`${filename} 다운로드 시작 (${rowCount}행)`);
@@ -165,20 +165,20 @@ export default function HistoryTab() {
               onClick={handleExport}
               disabled={isExporting || selectionMode}
               aria-label={isExporting ? '내보내는 중' : '내보내기'}
-              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-gray-100 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-gray-700 transition-colors hover:bg-gray-200 active:scale-95 disabled:opacity-60 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0"
+              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-gray-100 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-gray-700 transition-colors hover:bg-gray-200 active:scale-95 disabled:opacity-60 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px]"
             >
               <Upload size={14} />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">{isExporting ? '내보내는 중' : '내보내기'}</span>
+              <span className="whitespace-nowrap break-keep leading-none">{isExporting ? '내보내는 중' : '내보내기'}</span>
             </button>
             <button
               type="button"
               onClick={() => setImportOpen(true)}
               disabled={selectionMode}
               aria-label="가져오기"
-              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-blue-600 transition-colors hover:bg-blue-100 active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0"
+              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-blue-600 transition-colors hover:bg-blue-100 active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px]"
             >
               <FileSpreadsheet size={14} />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">가져오기</span>
+              <span className="whitespace-nowrap break-keep leading-none">가져오기</span>
             </button>
           </div>
         </div>
@@ -234,66 +234,73 @@ export default function HistoryTab() {
             <div
               key={e.id}
               onClick={() => selectionMode ? toggleEntrySelection(e.id) : setEditTarget({ ...e })}
-              className={`bg-white p-4 rounded-2xl border flex items-center justify-between group relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all ${
+              className={`grid items-center gap-3 bg-white p-4 rounded-2xl border group relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all max-[360px]:gap-2 max-[360px]:p-3.5 ${
+                selectionMode ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
+              } ${
                 selectedIds.has(e.id) ? 'border-blue-300 ring-2 ring-blue-50' : 'border-gray-100'
               }`}
             >
               <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full ${e.type === 'INCOME' ? 'bg-blue-500' : 'bg-red-400'}`} />
-              <div className="flex items-center space-x-3 pl-2 min-w-0 flex-1">
-                {selectionMode && (
-                  <div className="shrink-0">
-                    {selectedIds.has(e.id)
-                      ? <CheckSquare size={18} className="text-blue-500" />
-                      : <Square size={18} className="text-gray-300" />
-                    }
-                  </div>
-                )}
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${e.type === 'INCOME' ? 'bg-blue-50' : 'bg-red-50'}`}>
-                  {eventIcon(e.eventType)}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded shrink-0 ${e.type === 'INCOME' ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>
-                      {e.type === 'INCOME' ? 'IN' : 'OUT'}
+              <div className={`ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl max-[360px]:ml-1 ${
+                selectionMode ? 'bg-gray-50' : e.type === 'INCOME' ? 'bg-blue-50' : 'bg-red-50'
+              }`}>
+                {selectionMode
+                  ? selectedIds.has(e.id)
+                    ? <CheckSquare size={18} className="text-blue-500" />
+                    : <Square size={18} className="text-gray-300" />
+                  : eventIcon(e.eventType)
+                }
+              </div>
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded shrink-0 ${e.type === 'INCOME' ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>
+                    {e.type === 'INCOME' ? 'IN' : 'OUT'}
+                  </span>
+                  <button
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      if (selectionMode) {
+                        toggleEntrySelection(e.id);
+                        return;
+                      }
+                      const c = contacts.find(c => c.id === e.contactId || c.name === e.targetName);
+                      if (c) setSelectedContactId(c.id);
+                    }}
+                    className="min-w-0 truncate text-sm font-bold text-gray-900 hover:text-blue-600 transition-colors"
+                  >{e.targetName}</button>
+                  {e.memo?.trim() && (
+                    <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
+                      <StickyNote size={11} />
                     </span>
-                    <button
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        if (selectionMode) {
-                          toggleEntrySelection(e.id);
-                          return;
-                        }
-                        const c = contacts.find(c => c.id === e.contactId || c.name === e.targetName);
-                        if (c) setSelectedContactId(c.id);
-                      }}
-                      className="min-w-0 truncate text-sm font-bold text-gray-900 hover:text-blue-600 transition-colors"
-                    >{e.targetName}</button>
-                    {e.memo?.trim() && (
-                      <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
-                        <StickyNote size={11} />
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5 font-medium truncate">
-                    {safeDate(e.date)} · {eventLabel(e.eventType, e.customEventName)} {e.location ? `· ${e.location}` : ''}
-                  </p>
+                  )}
+                  {selectionMode && (
+                    <span className={`ml-auto shrink-0 whitespace-nowrap text-[13px] font-black leading-none max-[360px]:text-[12px] ${e.type === 'INCOME' ? 'text-blue-600' : 'text-red-500'}`}>
+                      {e.type === 'INCOME' ? '+' : '-'}{formatAmountMan(e.amount)}
+                    </span>
+                  )}
                 </div>
+                <p className="mt-0.5 truncate text-[10px] font-medium text-gray-400">
+                  {safeDate(e.date)} · {eventLabel(e.eventType, e.customEventName)} {e.location ? `· ${e.location}` : ''}
+                </p>
               </div>
-              <div className="flex items-center space-x-2 shrink-0">
-                <div className="text-right">
-                  <p className={`text-sm font-black ${e.type === 'INCOME' ? 'text-blue-600' : 'text-red-500'}`}>
-                    {e.type === 'INCOME' ? '+' : '-'}{formatAmountMan(e.amount)}
-                  </p>
-                  <p className="text-[9px] text-gray-300 font-medium">{e.relation}</p>
-                </div>
-                {!selectionMode && (
-                  <div className="flex items-center space-x-1">
-                    <button onClick={(ev) => { ev.stopPropagation(); setDeleteTarget({ id: e.id, name: e.targetName }); }} className="p-1.5 text-gray-300 active:text-red-500 transition-colors">
-                      <Trash2 size={15} />
-                    </button>
+              {!selectionMode && (
+                <>
+                  <div className="w-[58px] text-right max-[360px]:w-[52px]">
+                    <p className={`whitespace-nowrap text-[13px] font-black leading-tight max-[360px]:text-[12px] ${e.type === 'INCOME' ? 'text-blue-600' : 'text-red-500'}`}>
+                      {e.type === 'INCOME' ? '+' : '-'}{formatAmountMan(e.amount)}
+                    </p>
+                    <p className="mt-0.5 truncate text-[9px] font-medium leading-tight text-gray-300">{e.relation}</p>
                   </div>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={(ev) => { ev.stopPropagation(); setDeleteTarget({ id: e.id, name: e.targetName }); }}
+                    className="shrink-0 p-1.5 text-gray-300 active:text-red-500 transition-colors"
+                    aria-label="내역 삭제"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </>
+              )}
             </div>
           )) : (
             <div className="bg-white p-12 rounded-2xl border border-dashed border-gray-200 text-center">
