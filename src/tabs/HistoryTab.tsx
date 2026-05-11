@@ -141,34 +141,44 @@ export default function HistoryTab() {
 
   return (
     <div className="pb-4">
-      <div className="px-5 pt-14 pb-4 bg-white">
-        <div className="flex justify-between items-center">
+      <div className="px-5 pt-14 pb-4 bg-white max-[360px]:px-4">
+        <div className="flex items-center justify-between gap-2 max-[360px]:gap-1.5">
           <div className="min-w-0">
-            <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight">전체 내역</h1>
-            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400">{entries.length}건의 기록</p>
+            <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight max-[360px]:text-[20px]">전체 내역</h1>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400 max-[360px]:text-[11px]">{entries.length}건의 기록</p>
           </div>
-          <div className="flex items-center space-x-1.5">
+          <div className="flex shrink-0 items-center gap-1.5 max-[420px]:gap-1">
             <button
+              type="button"
               onClick={toggleSelectionMode}
               disabled={entries.length === 0 || isDeleting}
-              className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-bold transition-colors active:scale-95 disabled:opacity-50 ${
+              aria-label={selectionMode ? '선택 취소' : '내역 선택'}
+              className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-colors active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0 ${
                 selectionMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               {selectionMode ? <CheckSquare size={14} /> : <Square size={14} />}
-              <span>{selectionMode ? '취소' : '선택'}</span>
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">{selectionMode ? '취소' : '선택'}</span>
             </button>
             <button
+              type="button"
               onClick={handleExport}
               disabled={isExporting || selectionMode}
-              className="flex items-center space-x-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors active:scale-95 disabled:opacity-60"
+              aria-label={isExporting ? '내보내는 중' : '내보내기'}
+              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-gray-100 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-gray-700 transition-colors hover:bg-gray-200 active:scale-95 disabled:opacity-60 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0"
             >
               <Upload size={14} />
-              <span>{isExporting ? '내보내는 중' : '내보내기'}</span>
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">{isExporting ? '내보내는 중' : '내보내기'}</span>
             </button>
-            <button onClick={() => setImportOpen(true)} disabled={selectionMode} className="flex items-center space-x-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors active:scale-95 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              disabled={selectionMode}
+              aria-label="가져오기"
+              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-blue-600 transition-colors hover:bg-blue-100 active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0"
+            >
               <FileSpreadsheet size={14} />
-              <span>가져오기</span>
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">가져오기</span>
             </button>
           </div>
         </div>
