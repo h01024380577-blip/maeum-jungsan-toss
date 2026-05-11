@@ -27,9 +27,9 @@ export default function MyPageTab() {
     <div className="pb-8 min-h-screen bg-white">
       {/* 헤더 — 제목 + 우측 톱니바퀴 (설정 시트) */}
       <div className="px-5 pt-14 pb-2 flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-black text-gray-900 tracking-tight">MY</h1>
-          <p className="text-xs text-gray-400 mt-0.5">
+        <div className="min-w-0">
+          <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight">MY</h1>
+          <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400">
             {tossUserId
               ? '나의 활동과 설정'
               : '비로그인 · 활동은 로그인 후 저장돼요'}

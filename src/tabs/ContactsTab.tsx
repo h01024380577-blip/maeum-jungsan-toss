@@ -229,9 +229,9 @@ export default function ContactsTab() {
     <div ref={rootRef} className="pb-4">
       <div className="px-5 pt-14 pb-4 bg-white">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[22px] font-black text-gray-900 tracking-tight">연락처 관리</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{contacts.length}명의 연락처</p>
+          <div className="min-w-0">
+            <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight">연락처 관리</h1>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400">{contacts.length}명의 연락처</p>
           </div>
           <button onClick={() => setShowConfirm(true)} disabled={isSyncing} className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors active:scale-95 disabled:opacity-50">
             {isSyncing ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /> : <UserPlus size={18} />}

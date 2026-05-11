@@ -226,7 +226,7 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
           account: row.bank || '',
           amount: row.amount,
           relation: '지인',
-          memo: row.bank ? `${row.bank} 알림 파싱` : '알림 파싱',
+          memo: '',
           isIncome: true,
           source,
         });

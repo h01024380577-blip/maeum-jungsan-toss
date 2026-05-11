@@ -110,6 +110,17 @@ export default function EntryEditSheet({ entry, onClose }: EntryEditSheetProps) 
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-0.5">관계</label>
               <input type="text" value={draft.relation || ''} onChange={(e) => setDraft({...draft, relation: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl text-sm font-bold outline-none border border-gray-100" />
             </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-0.5">메모</label>
+              <textarea
+                value={draft.memo || ''}
+                onChange={(e) => setDraft({...draft, memo: e.target.value})}
+                rows={3}
+                placeholder="기억해둘 내용을 적어두세요"
+                className="w-full resize-none p-3 bg-gray-50 rounded-xl text-sm font-bold outline-none border border-gray-100 placeholder:text-gray-300 leading-relaxed"
+              />
+            </div>
           </div>
 
           <div className="flex space-x-2 pt-3 shrink-0">

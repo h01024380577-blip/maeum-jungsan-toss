@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       location: String(raw.location ?? '').trim() || '기타',
       relation: String(raw.relation ?? '').trim() || '지인',
       type,
-      memo: String(raw.memo ?? '대량 불러오기'),
+      memo: String(raw.memo ?? '').trim(),
       account: String(raw.account ?? ''),
     };
     entries.push({

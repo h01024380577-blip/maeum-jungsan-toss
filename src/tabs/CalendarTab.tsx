@@ -3,7 +3,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { useStore } from '../store/useStore';
 import { format, isSameDay, parseISO } from 'date-fns';
-import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportEventToCalendar, exportAllEventsToCalendar } from '../lib/exportToCalendar';
 import { isSamsungGalaxyDevice, hasSeenSamsungCalendarHint, markSamsungCalendarHintSeen } from '../lib/platformDetect';
@@ -139,9 +139,9 @@ export default function CalendarTab() {
       />
       <div className="px-5 pt-14 pb-4 bg-white">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-[22px] font-black text-gray-900 tracking-tight">경조사 달력</h1>
-            <p className="text-xs text-gray-400 mt-0.5">날짜를 선택해서 일정을 확인하세요</p>
+          <div className="min-w-0">
+            <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight">경조사 달력</h1>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400">날짜를 선택해서 일정을 확인하세요</p>
           </div>
           <button
             type="button"
@@ -174,12 +174,19 @@ export default function CalendarTab() {
           {selectedDayEvents.length > 0 ? (
             selectedDayEvents.map(e => (
               <div key={e.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+                <div className="flex min-w-0 items-center space-x-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${e.type === 'INCOME' ? 'bg-blue-50' : 'bg-red-50'}`}>
                     {eventIcon(e.eventType, 16)}
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{e.targetName}</p>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <p className="min-w-0 truncate text-sm font-bold text-gray-900">{e.targetName}</p>
+                      {e.memo?.trim() && (
+                        <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
+                          <StickyNote size={11} />
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center space-x-1 mt-0.5">
                       {e.location && <><MapPin size={10} className="text-gray-300" /><p className="text-[10px] text-gray-400">{e.location}</p></>}
                     </div>

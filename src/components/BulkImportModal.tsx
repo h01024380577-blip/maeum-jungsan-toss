@@ -81,7 +81,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
               relation: String(r['관계'] ?? '').trim() || '지인',
               type,
               isIncome,
-              memo: String(r['메모'] ?? '').trim() || '백업 복원',
+              memo: String(r['메모'] ?? '').trim(),
             });
           }
           resolve(rows);
@@ -197,7 +197,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         relation: mapping.relation !== -1 ? String(row[mapping.relation] || '').trim() : '지인',
         type: transactionType,
         isIncome: transactionType === 'INCOME',
-        memo: '대량 불러오기',
+        memo: '',
       };
     }).filter(Boolean);
   };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, User, Heart, Flower2, Cake, Star, ArrowUpRight, ArrowDownLeft, Calendar, MapPin, Trash2, Pencil, Check } from 'lucide-react';
+import { ArrowLeft, User, Heart, Flower2, Cake, Star, ArrowUpRight, ArrowDownLeft, Calendar, MapPin, Trash2, Pencil, Check, StickyNote } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -240,6 +240,11 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
               <div className="flex min-w-0 items-center gap-1.5">
                 {eventIcon(entry.eventType)}
                 <h4 className="min-w-0 truncate text-sm font-bold text-gray-900">{eventLabel(entry.eventType, entry.customEventName)}</h4>
+                {entry.memo?.trim() && (
+                  <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
+                    <StickyNote size={11} />
+                  </span>
+                )}
               </div>
               <div className="mt-1.5 space-y-1 text-[10px] font-semibold text-gray-400">
                 <div className="flex items-center gap-1 whitespace-nowrap">

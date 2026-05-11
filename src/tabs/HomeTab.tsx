@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
-import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info, StickyNote } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -439,8 +439,8 @@ export default function HomeTab() {
               height={40}
               className="h-10 w-10 rounded-[14px] shadow-sm"
             />
-            <div>
-              <h2 className="text-[17px] font-black leading-tight text-gray-950">마음정산</h2>
+            <div className="min-w-0">
+              <h2 className="whitespace-nowrap text-[17px] font-black leading-tight text-gray-950">마음정산</h2>
             </div>
           </div>
           {!tossUserId && (
@@ -455,13 +455,13 @@ export default function HomeTab() {
           )}
         </div>
 
-        <div className="mt-6 max-[360px]:mt-5">
-          <p className="break-keep text-[14px] font-bold text-blue-500 max-[360px]:text-[13px]">안녕하세요, {greetingName}</p>
-          <h1 className="mt-2.5 break-keep text-[24px] leading-[1.18] font-black text-gray-950 max-[360px]:text-[22px]">
+        <div className="mt-6 max-w-full max-[360px]:mt-5">
+          <p className="truncate whitespace-nowrap text-[14px] font-bold text-blue-500 max-[360px]:text-[13px]">안녕하세요, {greetingName}</p>
+          <h1 className="mt-2.5 whitespace-nowrap text-[22px] leading-[1.18] font-black text-gray-950 max-[360px]:text-[20px] max-[340px]:text-[19px]">
             어떤 마음을 정산할까요?
           </h1>
-          <p className="mt-3.5 break-keep text-[13px] leading-relaxed font-semibold text-gray-500 max-[360px]:text-[12px]">
-            링크·이미지·메시지를 붙여넣으면 <span className="text-blue-500">AI</span>가 자동으로 정리해드려요.
+          <p className="mt-3.5 whitespace-nowrap text-[13px] leading-relaxed font-semibold text-gray-500 max-[360px]:text-[12px] max-[340px]:text-[11px]">
+            링크·이미지·메시지를 <span className="text-blue-500">AI</span>가 정리해요.
           </p>
         </div>
 
@@ -493,7 +493,7 @@ export default function HomeTab() {
               type="button"
               onClick={handleCameraCapture}
               aria-label="카메라로 촬영"
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-1 text-[11px] font-black text-blue-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
             >
               <Camera size={14} className="shrink-0" />
               <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">카메라</span>
@@ -895,6 +895,7 @@ function RecentEntryRow({ entry, isLast, onClick }: { entry: EventEntry; isLast:
   const isIncome = entry.type === 'INCOME';
   const amountLabel = `${isIncome ? '+' : '-'}${formatAmountMan(entry.amount)}`;
   const detailLabel = entry.eventType === 'other' && entry.customEventName ? entry.customEventName : eventLabel(entry.eventType);
+  const hasMemo = !!entry.memo?.trim();
 
   return (
     <button
@@ -908,7 +909,14 @@ function RecentEntryRow({ entry, isLast, onClick }: { entry: EventEntry; isLast:
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-bold leading-tight text-gray-900 max-[360px]:text-[13px]">{entry.targetName || '이름 없음'}</p>
-          <p className="mt-0.5 truncate text-[10px] font-medium text-gray-400">{detailLabel} · {formatEntryDate(entry.date)}</p>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1">
+            <p className="min-w-0 truncate text-[10px] font-medium text-gray-400">{detailLabel} · {formatEntryDate(entry.date)}</p>
+            {hasMemo && (
+              <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
+                <StickyNote size={11} />
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div className="shrink-0 text-right">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore, type EventEntry } from '../store/useStore';
-import { Search, Trash2, Heart, Flower2, Cake, Star, FileSpreadsheet, Upload, CheckSquare, Square } from 'lucide-react';
+import { Search, Trash2, Heart, Flower2, Cake, Star, FileSpreadsheet, Upload, CheckSquare, Square, StickyNote } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import BulkImportModal from '../components/BulkImportModal';
@@ -143,9 +143,9 @@ export default function HistoryTab() {
     <div className="pb-4">
       <div className="px-5 pt-14 pb-4 bg-white">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-[22px] font-black text-gray-900 tracking-tight">전체 내역</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{entries.length}건의 기록</p>
+          <div className="min-w-0">
+            <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight">전체 내역</h1>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400">{entries.length}건의 기록</p>
           </div>
           <div className="flex items-center space-x-1.5">
             <button
@@ -242,7 +242,7 @@ export default function HistoryTab() {
                   {eventIcon(e.eventType)}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded shrink-0 ${e.type === 'INCOME' ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>
                       {e.type === 'INCOME' ? 'IN' : 'OUT'}
                     </span>
@@ -256,8 +256,13 @@ export default function HistoryTab() {
                         const c = contacts.find(c => c.id === e.contactId || c.name === e.targetName);
                         if (c) setSelectedContactId(c.id);
                       }}
-                      className="text-sm font-bold text-gray-900 hover:text-blue-600 transition-colors"
+                      className="min-w-0 truncate text-sm font-bold text-gray-900 hover:text-blue-600 transition-colors"
                     >{e.targetName}</button>
+                    {e.memo?.trim() && (
+                      <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
+                        <StickyNote size={11} />
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-gray-400 mt-0.5 font-medium truncate">
                     {safeDate(e.date)} · {eventLabel(e.eventType, e.customEventName)} {e.location ? `· ${e.location}` : ''}
