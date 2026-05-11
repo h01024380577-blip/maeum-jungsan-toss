@@ -374,7 +374,7 @@ export default function HomeTab() {
   };
 
   const handleManualEntry = () => {
-    const d: any = { targetName: '', date: format(new Date(), 'yyyy-MM-dd'), eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false };
+    const d: any = { targetName: '', date: format(new Date(), 'yyyy-MM-dd'), eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false, memo: '' };
     setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null);
     setParsedData(d); setInitialParsedData(null); setShowBottomSheet(true);
   };
@@ -723,6 +723,14 @@ export default function HomeTab() {
                       toast.error('복사 실패', { duration: 2500, icon: <AlertCircle size={16} /> });
                     }
                   }}
+                />
+
+                <Field
+                  label="메모"
+                  type="textarea"
+                  placeholder="필요한 내용만 적어두세요"
+                  value={parsedData.memo || ''}
+                  onChange={(v: string) => setParsedData({...parsedData, memo: v})}
                 />
               </div>
 
@@ -1229,8 +1237,8 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
   return (
     <div className="relative">
       <div className={`rounded-2xl border px-3.5 py-3 max-[360px]:px-2.5 ${fieldClass}`}>
-        <div className="flex min-h-6 items-center gap-2.5 max-[360px]:gap-2">
-          <label className="w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8">{label}</label>
+        <div className={`flex min-h-6 gap-2.5 max-[360px]:gap-2 ${type === 'textarea' ? 'items-start' : 'items-center'}`}>
+          <label className={`w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8 ${type === 'textarea' ? 'pt-0.5' : ''}`}>{label}</label>
       {type === 'select' ? (
             <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
           {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
@@ -1239,6 +1247,8 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
             <input ref={(node) => { inputRef.current = node; }} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
       ) : type === 'date' ? (
             <input type="date" value={value || ''} placeholder="yyyy-MM-dd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`} />
+      ) : type === 'textarea' ? (
+            <textarea ref={(node) => { inputRef.current = node; }} rows={3} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={`${inputClass} resize-none leading-relaxed font-bold`} />
       ) : shouldAutoFit ? (
             <textarea ref={(node) => { inputRef.current = node; }} rows={fitRows} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} style={{ fontSize: `${fitFontSize ?? maxFitFontSize}px` }} className={`${inputClass} resize-none overflow-hidden`} />
       ) : (
