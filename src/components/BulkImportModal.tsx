@@ -6,6 +6,8 @@ import { parseCSVFile, cleanAmount, cleanDate, normalizeEventType, RawCSVData } 
 import { useStore } from '../store/useStore';
 import { apiFetch } from '../lib/apiClient';
 import AdPromptDialog from './ads/AdPromptDialog';
+import { toast } from 'sonner';
+import { formatAmountMan } from '../utils/amountFormat';
 
 interface BackupRow {
   targetName: string;
@@ -210,6 +212,15 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setIsImporting(true);
     try {
       const result = await bulkAddEntries(processed as any);
+      if (result.inserted > 0) {
+        toast.success(`${result.inserted}건을 가져왔어요`, {
+          description: result.skipped > 0 ? `${result.skipped}건은 중복으로 건너뛰었어요.` : undefined,
+        });
+      } else {
+        toast.info('새로 가져올 내역이 없어요', {
+          description: result.skipped > 0 ? `${result.skipped}건은 중복으로 건너뛰었어요.` : undefined,
+        });
+      }
       setError(null);
       onClose();
       reset();
@@ -339,6 +350,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   </p>
                   <p>• 첫 번째 행은 제목(헤더)이어야 해요.</p>
                   <p>• 백업 파일은 내역 탭의 "내보내기" 로 만든 CSV 예요.</p>
+                  <p>• 이미 등록된 내역과 파일 안 중복 행은 자동으로 건너뜁니다.</p>
                 </div>
               </div>
             )}
@@ -494,7 +506,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                             )}
                             <td className="px-3 py-3 text-[13px] font-medium whitespace-nowrap">{row.targetName}</td>
                             <td className={`px-3 py-3 text-right text-[13px] font-bold tabular-nums whitespace-nowrap ${isIn ? 'text-blue-600' : 'text-red-500'}`}>
-                              {isIn ? '+' : '-'}{row.amount.toLocaleString()}원
+                              {isIn ? '+' : '-'}{formatAmountMan(row.amount)}
                             </td>
                             <td className="px-3 py-3 text-gray-500 text-xs break-words">{row.location}</td>
                           </tr>
@@ -511,6 +523,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                     {importMode === 'backup' && (
                       <> (받은 마음 <span className="font-bold text-blue-700">{incomeCount}건</span> · 보낸 마음 <span className="font-bold text-red-600">{expenseCount}건</span>)</>
                     )}
+                    <br />
+                    중복 내역은 저장하지 않고 자동으로 건너뜁니다.
                   </p>
                 </div>
 

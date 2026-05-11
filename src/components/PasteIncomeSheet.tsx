@@ -4,6 +4,7 @@ import { X, Clipboard, Sparkles, Check, AlertCircle, Trash2, Users, Heart, Flowe
 import { toast } from 'sonner';
 import { apiFetch } from '@/src/lib/apiClient';
 import { useStore, type Contact, type EventType, type TransactionSource } from '@/src/store/useStore';
+import { formatManInputValue, parseManInputToWon } from '@/src/utils/amountFormat';
 
 const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
   { value: 'wedding', label: '결혼', Icon: Heart },
@@ -177,8 +178,7 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
       prev.map((r) => {
         if (r._key !== key) return r;
         if (field === 'amount') {
-          const num = Number(value.replace(/[^0-9]/g, ''));
-          return { ...r, amount: Number.isFinite(num) ? num : 0 };
+          return { ...r, amount: parseManInputToWon(value) };
         }
         // senderName 변경 시 동명이인 매칭 재계산
         const matches = contacts.filter((c) => c.name === value);
@@ -287,7 +287,7 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={'예) [KB] 04/14 김진호님이 5만원 입금\n[카카오페이] 이나은님으로부터 100,000원 받음'}
+                    placeholder={'예) [KB] 04/14 김진호님이 5만원 입금\n[카카오페이] 이나은님으로부터 10만원 받음'}
                     rows={8}
                     className="w-full p-4 bg-gray-50 rounded-2xl text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-gray-300 leading-relaxed"
                     disabled={isParsing}
@@ -347,13 +347,13 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-1">
                                 <input
-                                  value={row.amount.toLocaleString()}
+                                  value={formatManInputValue(row.amount)}
                                   onChange={(e) => updateField(row._key, 'amount', e.target.value)}
-                                  inputMode="numeric"
+                                  inputMode="decimal"
                                   className="w-24 bg-transparent font-bold text-blue-600 text-sm outline-none border-b border-transparent focus:border-blue-300 text-right"
                                   disabled={!row._selected}
                                 />
-                                <span className="text-xs text-blue-600 font-bold">원</span>
+                                <span className="text-xs text-blue-600 font-bold">만</span>
                               </div>
                               <div className="flex items-center space-x-2 text-[11px] text-gray-400">
                                 {row.bank && <span>{row.bank}</span>}

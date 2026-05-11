@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowLeft, User, Heart, Flower2, Cake, Star, ArrowUpRight, ArrowDownLeft, Calendar, MapPin, Trash2, Pencil, Check } from 'lucide-react';
-import { useStore, EventType } from '../store/useStore';
+import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
+import EntryEditSheet from './EntryEditSheet';
+import { formatAmountMan, formatSignedAmountMan } from '../utils/amountFormat';
 
 const RELATION_PRESETS = ['가족', '친척', '친구', '동료', '지인', '기타'] as const;
 
@@ -25,10 +27,13 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
   const [showRelationEdit, setShowRelationEdit] = useState(false);
   const [relationDraft, setRelationDraft] = useState('');
   const [savingRelation, setSavingRelation] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
   const contact = contacts.find(c => c.id === contactId);
-  const ce = entries.filter(e => e.contactId === contactId);
 
   if (!contact) return null;
+
+  const contactName = contact.name.trim();
+  const ce = entries.filter(e => e.contactId === contactId || (!!contactName && e.targetName.trim() === contactName));
 
   const openRelationEdit = () => {
     setRelationDraft(contact.relation || '');
@@ -192,7 +197,7 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{contact.name}님과의 마음 정산</p>
           <motion.h2 key={balance} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             className={`text-4xl font-black tracking-tight ${balance >= 0 ? 'text-blue-600' : 'text-red-500'}`}>
-            {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+            {formatSignedAmountMan(balance)}
           </motion.h2>
           <span className={`inline-block px-3 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${balance >= 0 ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>
             {balance >= 0 ? 'Surplus' : 'Deficit'}
@@ -208,11 +213,11 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
           <div className="flex justify-between">
             <div>
               <p className="text-[9px] font-bold text-gray-400 uppercase">보낸 마음 (OUT)</p>
-              <p className="text-sm font-black text-red-500">{given.toLocaleString()}</p>
+              <p className="text-sm font-black text-red-500">{formatAmountMan(given)}</p>
             </div>
             <div className="text-right">
               <p className="text-[9px] font-bold text-gray-400 uppercase">받은 마음 (IN)</p>
-              <p className="text-sm font-black text-blue-600">{received.toLocaleString()}</p>
+              <p className="text-sm font-black text-blue-600">{formatAmountMan(received)}</p>
             </div>
           </div>
         </div>
@@ -222,32 +227,45 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
       <div className="space-y-2.5">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">경조사 내역 ({ce.length})</h3>
         {ce.length > 0 ? ce.map(entry => (
-          <div key={entry.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${entry.type === 'EXPENSE' ? 'bg-red-50' : 'bg-blue-50'}`}>
-                {entry.type === 'EXPENSE' ? <ArrowUpRight size={16} className="text-red-500" /> : <ArrowDownLeft size={16} className="text-blue-600" />}
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => setSelectedEntry(entry)}
+            className="flex w-full items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4 text-left transition-all active:scale-[0.98] active:bg-gray-50 max-[360px]:p-3.5"
+          >
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${entry.type === 'EXPENSE' ? 'bg-red-50' : 'bg-blue-50'}`}>
+              {entry.type === 'EXPENSE' ? <ArrowUpRight size={16} className="text-red-500" /> : <ArrowDownLeft size={16} className="text-blue-600" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                {eventIcon(entry.eventType)}
+                <h4 className="min-w-0 truncate text-sm font-bold text-gray-900">{eventLabel(entry.eventType, entry.customEventName)}</h4>
               </div>
-              <div>
-                <div className="flex items-center space-x-1.5">
-                  {eventIcon(entry.eventType)}
-                  <h4 className="text-sm font-bold text-gray-900">{eventLabel(entry.eventType, entry.customEventName)}</h4>
+              <div className="mt-1.5 space-y-1 text-[10px] font-semibold text-gray-400">
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <Calendar size={10} className="shrink-0" />
+                  <span>{safeDate(entry.date)}</span>
                 </div>
-                <div className="flex items-center space-x-1.5 text-[10px] text-gray-400 font-medium mt-0.5">
-                  <Calendar size={9} /><span>{safeDate(entry.date)}</span>
-                  {entry.location && <><span className="text-gray-200">·</span><MapPin size={9} /><span>{entry.location}</span></>}
-                </div>
+                {entry.location && (
+                  <div className="flex min-w-0 items-start gap-1">
+                    <MapPin size={10} className="mt-0.5 shrink-0" />
+                    <span className="min-w-0 truncate">{entry.location}</span>
+                  </div>
+                )}
               </div>
             </div>
-            <p className={`text-sm font-black ${entry.type === 'EXPENSE' ? 'text-red-500' : 'text-blue-600'}`}>
-              {entry.type === 'EXPENSE' ? '-' : '+'}{entry.amount.toLocaleString()}
+            <p className={`shrink-0 whitespace-nowrap pt-1 text-right text-sm font-black tabular-nums max-[360px]:text-[13px] ${entry.type === 'EXPENSE' ? 'text-red-500' : 'text-blue-600'}`}>
+              {entry.type === 'EXPENSE' ? '-' : '+'}{formatAmountMan(entry.amount)}
             </p>
-          </div>
+          </button>
         )) : (
           <div className="bg-white p-10 rounded-2xl border border-dashed border-gray-200 text-center">
             <p className="text-sm text-gray-300">내역이 없습니다</p>
           </div>
         )}
       </div>
+
+      <EntryEditSheet entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </div>
   );
 }

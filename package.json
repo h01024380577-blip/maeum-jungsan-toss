@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "granite dev",
-    "build": "granite build",
+    "build": "npm run build:artifact",
+    "build:artifact": "ait build && node scripts/verify-ait-artifact.mjs",
     "build:next": "prisma generate && next build",
     "build:csr": "NEXT_BUILD_CSR=1 prisma generate && next build",
     "build:ait": "bash scripts/build-ait.sh",

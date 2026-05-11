@@ -104,26 +104,28 @@ enum Confidence {
 }
 
 model Event {
-  id              String     @id @default(cuid())
-  userId          String
-  contactId       String?
-  eventType       EventType
-  targetName      String
-  date            DateTime
-  location        String     @default("")
-  relation        String     @default("")
-  sourceUrl       String?
-  memo            String     @default("")
-  customEventName String?
-  account         String     @default("")
-  uiTheme         UiTheme    @default(DEFAULT)
-  confidence      Confidence @default(MEDIUM)
-  createdAt       DateTime   @default(now())
+  id                String     @id @default(cuid())
+  userId            String
+  contactId         String?
+  eventType         EventType
+  targetName        String
+  date              DateTime
+  location          String     @default("")
+  relation          String     @default("")
+  sourceUrl         String?
+  memo              String     @default("")
+  customEventName   String?
+  account           String     @default("")
+  importFingerprint String?
+  uiTheme           UiTheme    @default(DEFAULT)
+  confidence        Confidence @default(MEDIUM)
+  createdAt         DateTime   @default(now())
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   contact      Contact?      @relation(fields: [contactId], references: [id])
   transactions Transaction[]
 
+  @@unique([userId, importFingerprint])
   @@index([userId])
   @@index([date])
 }

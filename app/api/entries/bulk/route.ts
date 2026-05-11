@@ -7,6 +7,16 @@ import {
   resolveDbUserId,
   isGuardEnabled,
 } from '@/src/lib/credits';
+import {
+  buildBulkDuplicateKey,
+  dateFromBulkDateKey,
+  normalizeBulkEventType,
+  normalizeBulkName,
+  parseBulkAmount,
+  parseBulkDate,
+  type BulkEventType,
+  type BulkTransactionType,
+} from '@/src/lib/bulkEntryDedup';
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req);
@@ -24,17 +34,19 @@ interface BulkEntryInput {
   account?: string;
 }
 
-function normalizeEventType(raw: unknown): 'WEDDING' | 'FUNERAL' | 'BIRTHDAY' | 'OTHER' {
-  const upper = String(raw ?? '').toUpperCase();
-  if (upper === 'WEDDING' || upper === 'FUNERAL' || upper === 'BIRTHDAY' || upper === 'OTHER') {
-    return upper;
-  }
-  const lower = String(raw ?? '').toLowerCase();
-  if (lower.includes('결혼') || lower === 'wedding') return 'WEDDING';
-  if (lower.includes('장례') || lower.includes('조의') || lower === 'funeral') return 'FUNERAL';
-  if (lower.includes('생일') || lower.includes('돌') || lower === 'birthday') return 'BIRTHDAY';
-  return 'OTHER';
-}
+type NormalizedBulkEntry = {
+  targetName: string;
+  amount: number;
+  date: Date;
+  dateKey: string;
+  importFingerprint: string;
+  eventType: BulkEventType;
+  location: string;
+  relation: string;
+  type: BulkTransactionType;
+  memo: string;
+  account: string;
+};
 
 export async function POST(req: NextRequest) {
   const userId = await resolveDbUserId(req);
@@ -49,35 +61,29 @@ export async function POST(req: NextRequest) {
   }
 
   // 입력 정규화
-  const entries: Array<{
-    targetName: string;
-    amount: number;
-    date: Date;
-    eventType: 'WEDDING' | 'FUNERAL' | 'BIRTHDAY' | 'OTHER';
-    location: string;
-    relation: string;
-    type: 'INCOME' | 'EXPENSE';
-    memo: string;
-    account: string;
-  }> = [];
+  const entries: NormalizedBulkEntry[] = [];
 
   for (const raw of rawEntries as BulkEntryInput[]) {
     const targetName = String(raw.targetName ?? '').trim();
-    const amount = Number(raw.amount) || 0;
+    const amount = parseBulkAmount(raw.amount);
     if (!targetName || amount <= 0) continue;
-    const dateStr = String(raw.date ?? '').trim();
-    const parsedDate = dateStr ? new Date(dateStr) : new Date();
-    const date = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-    entries.push({
+    const { date, dateKey } = parseBulkDate(raw.date);
+    const type: BulkTransactionType = raw.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+    const entry = {
       targetName,
       amount,
       date,
-      eventType: normalizeEventType(raw.eventType),
+      dateKey,
+      eventType: normalizeBulkEventType(raw.eventType),
       location: String(raw.location ?? '').trim() || '기타',
       relation: String(raw.relation ?? '').trim() || '지인',
-      type: raw.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
+      type,
       memo: String(raw.memo ?? '대량 불러오기'),
       account: String(raw.account ?? ''),
+    };
+    entries.push({
+      ...entry,
+      importFingerprint: buildBulkDuplicateKey(entry),
     });
   }
 
@@ -99,32 +105,95 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`bulk-entries:${userId}`})::bigint)`;
+
+      const seenIncoming = new Set<string>();
+      const uniqueEntries: NormalizedBulkEntry[] = [];
+      let skipped = 0;
+
+      for (const entry of entries) {
+        const key = buildBulkDuplicateKey(entry);
+        if (seenIncoming.has(key)) {
+          skipped += 1;
+          continue;
+        }
+        seenIncoming.add(key);
+        uniqueEntries.push(entry);
+      }
+
       // Contact name 목록에 대해 한 번에 조회
-      const uniqueNames = Array.from(new Set(entries.map((e) => e.targetName)));
+      const dateKeys = Array.from(new Set(uniqueEntries.map((entry) => entry.dateKey))).sort();
+      const startDate = dateFromBulkDateKey(dateKeys[0]);
+      const endDate = dateFromBulkDateKey(dateKeys[dateKeys.length - 1]);
+      endDate.setUTCHours(23, 59, 59, 999);
+      const existingEvents = dateKeys.length > 0
+        ? await tx.event.findMany({
+          where: {
+            userId,
+            date: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+          include: {
+            transactions: {
+              take: 1,
+              orderBy: { createdAt: 'desc' },
+              select: { type: true, amount: true },
+            },
+          },
+        })
+        : [];
+      const existingKeys = new Set(
+        existingEvents.flatMap((event) => {
+          const tx = event.transactions[0];
+          if (!tx) return [];
+          return [
+            event.importFingerprint,
+            buildBulkDuplicateKey({
+              targetName: event.targetName,
+              amount: tx.amount,
+              date: event.date,
+              type: tx.type,
+            }),
+          ].filter((key): key is string => typeof key === 'string' && key.length > 0);
+        }),
+      );
+      const entriesToInsert = uniqueEntries.filter((entry) => {
+        const isDuplicate = existingKeys.has(entry.importFingerprint);
+        if (isDuplicate) skipped += 1;
+        return !isDuplicate;
+      });
+
+      if (entriesToInsert.length === 0) {
+        return { inserted: 0, skipped };
+      }
+
       const existingContacts = await tx.contact.findMany({
-        where: { userId, name: { in: uniqueNames } },
+        where: { userId },
         select: { id: true, name: true },
       });
       const contactByName = new Map<string, string>(
-        existingContacts.map((c) => [c.name, c.id]),
+        existingContacts.map((c) => [normalizeBulkName(c.name), c.id]),
       );
 
       // 누락된 contact 생성
-      for (const name of uniqueNames) {
-        if (!contactByName.has(name)) {
+      for (const name of Array.from(new Set(entriesToInsert.map((e) => e.targetName)))) {
+        const normalizedName = normalizeBulkName(name);
+        if (!contactByName.has(normalizedName)) {
           const relation =
-            entries.find((e) => e.targetName === name)?.relation || '지인';
+            entriesToInsert.find((e) => e.targetName === name)?.relation || '지인';
           const created = await tx.contact.create({
             data: { userId, name, relation },
             select: { id: true },
           });
-          contactByName.set(name, created.id);
+          contactByName.set(normalizedName, created.id);
         }
       }
 
       let inserted = 0;
-      for (const entry of entries) {
-        const contactId = contactByName.get(entry.targetName)!;
+      for (const entry of entriesToInsert) {
+        const contactId = contactByName.get(normalizeBulkName(entry.targetName))!;
         const event = await tx.event.create({
           data: {
             userId,
@@ -136,6 +205,7 @@ export async function POST(req: NextRequest) {
             relation: entry.relation,
             memo: entry.memo,
             account: entry.account,
+            importFingerprint: entry.importFingerprint,
           },
           select: { id: true },
         });
@@ -152,12 +222,21 @@ export async function POST(req: NextRequest) {
         });
         inserted += 1;
       }
-      return { inserted };
+      return { inserted, skipped };
     });
+
+    if (guardOn && result.inserted === 0) {
+      await refundCredit(userId, 'CSV_CREDIT');
+    }
 
     return withCors(
       req,
-      NextResponse.json({ success: true, inserted: result.inserted, attempted: entries.length }),
+      NextResponse.json({
+        success: true,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        attempted: entries.length,
+      }),
     );
   } catch (err) {
     // 0건 저장 실패 → CSV 크레딧 환불

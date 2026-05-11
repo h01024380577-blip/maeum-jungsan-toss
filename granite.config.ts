@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: '마음정산',
     primaryColor: '#3B82F6',
-    icon: 'http://3.238.129.126:3000/icon.png',
+    icon: 'https://maeum-jungsan.duckdns.org/icon.png',
   },
   web: {
     host: 'localhost',

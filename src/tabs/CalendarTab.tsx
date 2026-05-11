@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { exportEventToCalendar, exportAllEventsToCalendar } from '../lib/exportToCalendar';
 import { isSamsungGalaxyDevice, hasSeenSamsungCalendarHint, markSamsungCalendarHintSeen } from '../lib/platformDetect';
 import SamsungCalendarHintDialog from '../components/SamsungCalendarHintDialog';
+import { formatAmountMan } from '../utils/amountFormat';
 
 const eventIcon = (t: string, size = 12) => {
   if (t === 'wedding') return <Heart size={size} className="text-pink-500 fill-pink-500" />;
@@ -186,7 +187,7 @@ export default function CalendarTab() {
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-black ${e.type === 'INCOME' ? 'text-blue-600' : 'text-red-500'}`}>
-                    {e.type === 'INCOME' ? '+' : '-'}{e.amount.toLocaleString()}
+                    {e.type === 'INCOME' ? '+' : '-'}{formatAmountMan(e.amount)}
                   </p>
                   <p className="text-[10px] text-gray-400 font-medium">{e.relation}</p>
                   <button

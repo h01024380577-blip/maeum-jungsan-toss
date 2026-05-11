@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, UserPlus, ArrowRight, User, CheckCircle, AlertCircle, Star, Check, X, ArrowUp } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import { useStore, type Contact } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContactDetail from '../components/ContactDetail';
+import { formatSignedAmountMan } from '../utils/amountFormat';
 
 type FetchedContact = { name: string; phone: string; relation: string };
 const makeKey = (c: FetchedContact, i: number) => `${i}|${c.name}|${c.phone}`;
@@ -16,17 +17,22 @@ export default function ContactsTab() {
   const scrollParentRef = useRef<HTMLElement | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const getBalance = (id: string) => {
-    const ce = entries.filter(e => e.contactId === id);
+  const getContactEntries = (contact: Contact) => {
+    const name = contact.name.trim();
+    return entries.filter(e => e.contactId === contact.id || (!!name && e.targetName.trim() === name));
+  };
+
+  const getBalance = (contact: Contact) => {
+    const ce = getContactEntries(contact);
     return ce.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0) - ce.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
   };
 
-  const getRecent = (id: string) => {
-    const ce = entries.filter(e => e.contactId === id);
+  const getRecent = (contact: Contact) => {
+    const ce = getContactEntries(contact);
     return ce.length === 0 ? 0 : Math.max(...ce.map(e => new Date(e.date).getTime()));
   };
 
-  const getCount = (id: string) => entries.filter(e => e.contactId === id).length;
+  const getCount = (contact: Contact) => getContactEntries(contact).length;
 
   const filtered = contacts
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
@@ -35,8 +41,8 @@ export default function ContactsTab() {
       const favDiff = (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0);
       if (favDiff !== 0) return favDiff;
       if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'balance') return getBalance(b.id) - getBalance(a.id);
-      return getRecent(b.id) - getRecent(a.id);
+      if (sortBy === 'balance') return getBalance(b) - getBalance(a);
+      return getRecent(b) - getRecent(a);
     });
 
   const toggleFavorite = (id: string, current: boolean) => {
@@ -250,8 +256,8 @@ export default function ContactsTab() {
 
         <div className="space-y-2">
           {filtered.map((c) => {
-            const bal = getBalance(c.id);
-            const cnt = getCount(c.id);
+            const bal = getBalance(c);
+            const cnt = getCount(c);
             return (
               <motion.div layout key={c.id} onClick={() => setSelectedContactId(c.id)}
                 className={`bg-white p-4 rounded-2xl border flex items-center justify-between hover:shadow-md transition-all cursor-pointer group active:scale-[0.98] ${c.isFavorite ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100'}`}
@@ -278,7 +284,7 @@ export default function ContactsTab() {
                 <div className="flex items-center space-x-3 shrink-0">
                   <div className="text-right">
                     <div className={`text-sm font-black flex items-center justify-end ${bal === 0 ? 'text-gray-400' : bal > 0 ? 'text-blue-600' : 'text-red-500'}`}>
-                      {bal >= 0 ? '+' : ''}{bal.toLocaleString()}
+                      {formatSignedAmountMan(bal)}
                     </div>
                   </div>
                   <ArrowRight size={14} className="text-gray-200 group-hover:text-blue-500 transition-colors" />

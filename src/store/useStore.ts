@@ -78,7 +78,7 @@ interface AppState {
   removeContact: (id: string) => Promise<void>;
   syncContacts: (contacts: Omit<Contact, 'id' | 'userId'>[]) => Promise<{ inserted: number; skipped: number; attempted: number }>;
   addFeedback: (original: any, corrected: any) => void;
-  bulkAddEntries: (entries: Omit<EventEntry, 'id' | 'createdAt' | 'userId'>[]) => Promise<{ inserted: number }>;
+  bulkAddEntries: (entries: Omit<EventEntry, 'id' | 'createdAt' | 'userId'>[]) => Promise<{ inserted: number; skipped: number; attempted: number }>;
   refreshCredits: () => Promise<void>;
   clearData: () => void;
   setNotificationsEnabled: (enabled: boolean) => void;
@@ -279,7 +279,11 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     // CSV 크레딧 차감 반영
     get().refreshCredits();
-    return { inserted: json.inserted ?? 0 };
+    return {
+      inserted: json.inserted ?? 0,
+      skipped: json.skipped ?? 0,
+      attempted: json.attempted ?? entries.length,
+    };
   },
 
   addFeedback: (original, corrected) =>

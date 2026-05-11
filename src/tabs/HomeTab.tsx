@@ -3,10 +3,12 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
 import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
-import { useStore, EventEntry, EventType } from '../store/useStore';
+import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
+import EntryEditSheet from '../components/EntryEditSheet';
+import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
 
 
 
@@ -117,12 +119,28 @@ type TossPermissionFunction = {
   openPermissionDialog?: () => Promise<TossPermissionStatus>;
 };
 
+type TossImageResponse = {
+  dataUri?: string | null;
+  base64?: string | null;
+};
+
 async function ensureTossPermission(fn: TossPermissionFunction): Promise<boolean> {
   const current = await fn.getPermission?.().catch(() => null);
   if (!current || current === 'allowed') return true;
   if (current === 'denied') return false;
   const next = await fn.openPermissionDialog?.().catch(() => null);
   return next === 'allowed';
+}
+
+function normalizeImageDataUri(image?: TossImageResponse | null): string | null {
+  const raw = image?.dataUri || image?.base64;
+  if (typeof raw !== 'string') return null;
+
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return value;
+
+  return `data:image/jpeg;base64,${value}`;
 }
 
 const eventIcon = (t: string, size = 14) => {
@@ -141,21 +159,14 @@ const eventOptions: { value: EventType; label: string; Icon: typeof Heart }[] = 
   { value: 'other', label: '기타', Icon: Star },
 ];
 
+type MonthEntryFilter = 'INCOME' | 'EXPENSE' | 'ALL';
+
 function formatSheetDate(value?: string) {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00`);
   if (isNaN(date.getTime())) return value;
   const weekday = new Intl.DateTimeFormat('ko-KR', { weekday: 'short' }).format(date);
   return `${format(date, 'yyyy.MM.dd')} (${weekday})`;
-}
-
-function formatMan(value: number) {
-  return `${Math.round(Math.abs(value) / 10000)}만`;
-}
-
-function formatSignedMan(value: number) {
-  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
-  return `${sign}${formatMan(value)}`;
 }
 
 function formatEntryDate(value?: string) {
@@ -198,6 +209,8 @@ export default function HomeTab() {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [savedAccount, setSavedAccount] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
+  const [monthEntryFilter, setMonthEntryFilter] = useState<MonthEntryFilter | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
@@ -212,6 +225,23 @@ export default function HomeTab() {
   const monthGiven = monthEntries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
   const monthReceived = monthEntries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
   const monthBalance = monthReceived - monthGiven;
+  const visibleMonthEntries = monthEntryFilter === 'INCOME'
+    ? monthEntries.filter(e => e.type === 'INCOME')
+    : monthEntryFilter === 'EXPENSE'
+    ? monthEntries.filter(e => e.type === 'EXPENSE')
+    : monthEntries;
+  const monthSheetTitle =
+    monthEntryFilter === 'INCOME' ? '이번 달 받은 마음'
+    : monthEntryFilter === 'EXPENSE' ? '이번 달 보낸 마음'
+    : '이번 달 마음정산';
+  const monthSheetAmount =
+    monthEntryFilter === 'INCOME' ? formatAmountMan(monthReceived)
+    : monthEntryFilter === 'EXPENSE' ? formatAmountMan(monthGiven)
+    : formatSignedAmountMan(monthBalance);
+  const monthSheetTone =
+    monthEntryFilter === 'EXPENSE' ? 'text-red-500'
+    : monthEntryFilter === 'ALL' && monthBalance < 0 ? 'text-red-500'
+    : 'text-blue-600';
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -230,8 +260,14 @@ export default function HomeTab() {
         toast.error('카메라 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      const r: any = await openCamera();
-      if (r?.base64) { const d = `data:image/jpeg;base64,${r.base64}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+      const result: TossImageResponse = await openCamera({ base64: true, maxWidth: 1024 });
+      const imageData = normalizeImageDataUri(result);
+      if (!imageData) {
+        toast.error('사진을 가져오지 못했어요. 다시 촬영해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+        return;
+      }
+      setSelectedImage(imageData);
+      handleParse({ type: 'image', data: imageData });
     } catch {
       toast.error('카메라를 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
@@ -245,8 +281,14 @@ export default function HomeTab() {
         toast.error('사진 접근 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      const r: any = await fetchAlbumPhotos({ maxCount: 1, base64: true });
-      if (r?.[0]?.dataUri) { const d = `data:image/jpeg;base64,${r[0].dataUri}`; setSelectedImage(d); handleParse({ type: 'image', data: d }); }
+      const result: TossImageResponse[] = await fetchAlbumPhotos({ maxCount: 1, base64: true, maxWidth: 1024 });
+      const imageData = normalizeImageDataUri(result?.[0]);
+      if (!imageData) {
+        toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+        return;
+      }
+      setSelectedImage(imageData);
+      handleParse({ type: 'image', data: imageData });
     } catch {
       toast.error('앨범을 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
@@ -332,7 +374,7 @@ export default function HomeTab() {
   };
 
   const handleManualEntry = () => {
-    const d: any = { targetName: '', date: '', eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false };
+    const d: any = { targetName: '', date: format(new Date(), 'yyyy-MM-dd'), eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false };
     setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null);
     setParsedData(d); setInitialParsedData(null); setShowBottomSheet(true);
   };
@@ -387,7 +429,7 @@ export default function HomeTab() {
 
   return (
     <div className="pb-5">
-      <div className="px-5 pt-8 pb-3">
+      <div className="px-5 pt-8 pb-3 max-[360px]:px-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <img
@@ -413,17 +455,17 @@ export default function HomeTab() {
           )}
         </div>
 
-        <div className="mt-6">
-          <p className="text-[14px] font-bold text-blue-500">안녕하세요, {greetingName}</p>
-          <h1 className="mt-2.5 text-[24px] leading-[1.18] font-black tracking-tight text-gray-950">
+        <div className="mt-6 max-[360px]:mt-5">
+          <p className="break-keep text-[14px] font-bold text-blue-500 max-[360px]:text-[13px]">안녕하세요, {greetingName}</p>
+          <h1 className="mt-2.5 break-keep text-[24px] leading-[1.18] font-black text-gray-950 max-[360px]:text-[22px]">
             어떤 마음을 정산할까요?
           </h1>
-          <p className="mt-3.5 text-[13px] leading-relaxed font-semibold text-gray-500">
+          <p className="mt-3.5 break-keep text-[13px] leading-relaxed font-semibold text-gray-500 max-[360px]:text-[12px]">
             링크·이미지·메시지를 붙여넣으면 <span className="text-blue-500">AI</span>가 자동으로 정리해드려요.
           </p>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm max-[360px]:p-3">
           {selectedImage ? (
             <div className="flex min-h-[64px] items-center gap-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse">
@@ -442,49 +484,53 @@ export default function HomeTab() {
                 else setInputText(event.target.value);
               }}
               placeholder={inputMode === 'url' ? '초대장 URL을 붙여넣으세요...' : '이미지 또는 메시지를 입력하세요...'}
-              className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+              className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 max-[360px]:h-[68px] max-[360px]:text-[13px]"
             />
           )}
 
-          <div className="mt-3 flex items-center gap-1">
+          <div className="mt-3 flex items-center gap-1 max-[360px]:gap-0.5">
             <button
               type="button"
               onClick={handleCameraCapture}
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-1 text-[11px] font-black text-blue-600 active:scale-95 transition-all"
+              aria-label="카메라로 촬영"
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 px-1 text-[11px] font-black text-blue-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
             >
-              <Camera size={14} />
-              <span>카메라</span>
+              <Camera size={14} className="shrink-0" />
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">카메라</span>
             </button>
             <button
               type="button"
               onClick={handleAlbumSelect}
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all"
+              aria-label="앨범에서 선택"
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
             >
-              <ImageIcon size={14} />
-              <span>앨범</span>
+              <ImageIcon size={14} className="shrink-0" />
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">앨범</span>
             </button>
             <button
               type="button"
               onClick={handleUrlMode}
-              className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black active:scale-95 transition-all ${inputMode === 'url' ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}`}
+              aria-label="URL 입력"
+              className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px] ${inputMode === 'url' ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}`}
             >
-              <LinkIcon size={14} />
-              <span>URL</span>
+              <LinkIcon size={14} className="shrink-0" />
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">URL</span>
             </button>
-            <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+            <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200 max-[360px]:hidden" />
             <button
               type="button"
               onClick={handleManualEntry}
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all"
+              aria-label="직접 입력"
+              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
             >
-              <Plus size={14} />
-              <span>직접</span>
+              <Plus size={14} className="shrink-0" />
+              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">직접</span>
             </button>
             <button
               type="button"
               onClick={handlePrimaryAnalyze}
               disabled={!canAnalyzeInput}
-              className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
+              className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 max-[360px]:ml-0 ${
                 canAnalyzeInput ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-gray-200 text-gray-400'
               }`}
               aria-label="AI 분석"
@@ -497,7 +543,7 @@ export default function HomeTab() {
 
       </div>
 
-      <div className="px-5 space-y-6">
+      <div className="space-y-6 px-5 max-[360px]:space-y-5 max-[360px]:px-4">
         <section>
           <div className="mb-2.5 flex items-center justify-between">
             <h3 className="text-[14px] font-black text-gray-800">
@@ -512,24 +558,27 @@ export default function HomeTab() {
               <ChevronRight size={13} />
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5 max-[360px]:gap-1.5">
             <SummaryTile
               label="받은 마음"
-              value={formatMan(monthReceived)}
+              value={formatAmountMan(monthReceived)}
               suffix=""
               tone="blue"
+              onClick={() => setMonthEntryFilter('INCOME')}
             />
             <SummaryTile
               label="보낸 마음"
-              value={formatMan(monthGiven)}
+              value={formatAmountMan(monthGiven)}
               suffix=""
               tone="red"
+              onClick={() => setMonthEntryFilter('EXPENSE')}
             />
             <SummaryTile
               label="합계"
-              value={formatSignedMan(monthBalance)}
+              value={formatSignedAmountMan(monthBalance)}
               suffix=""
               tone={monthBalance >= 0 ? 'blue' : 'red'}
+              onClick={() => setMonthEntryFilter('ALL')}
             />
           </div>
         </section>
@@ -549,7 +598,12 @@ export default function HomeTab() {
           {recentEntries.length > 0 ? (
             <div className="overflow-hidden rounded-[20px] bg-white shadow-sm border border-gray-100">
               {recentEntries.map((entry, index) => (
-                <RecentEntryRow key={entry.id} entry={entry} isLast={index === recentEntries.length - 1} />
+                <RecentEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  isLast={index === recentEntries.length - 1}
+                  onClick={() => setSelectedEntry(entry)}
+                />
               ))}
             </div>
           ) : (
@@ -566,8 +620,8 @@ export default function HomeTab() {
         {showBottomSheet && parsedData && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowBottomSheet(false)} className="fixed inset-0 bg-black/40 z-[60]" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] max-h-[94dvh] bg-white rounded-t-[32px] z-[70] shadow-2xl overflow-hidden flex flex-col">
-              <div className="shrink-0 border-b border-gray-100 bg-white px-5 pb-3 pt-2">
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 z-[70] flex max-h-[94dvh] w-full max-w-[430px] -translate-x-1/2 flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
+              <div className="shrink-0 border-b border-gray-100 bg-white px-5 pb-3 pt-2 max-[360px]:px-4">
                 <div className="w-14 h-1 bg-gray-300 rounded-full mx-auto mb-3.5" />
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -575,7 +629,7 @@ export default function HomeTab() {
                       <Sparkles size={12} />
                       <span>{initialParsedData ? 'AI 분석 완료' : '직접 입력'}</span>
                     </div>
-                    <h3 className="mt-1.5 text-[20px] leading-tight font-black tracking-tight text-gray-950">
+                    <h3 className="mt-1.5 break-keep text-[20px] leading-tight font-black text-gray-950 max-[360px]:text-[18px]">
                       {initialParsedData ? '내용을 확인해주세요' : '내용을 입력해주세요'}
                     </h3>
                   </div>
@@ -590,7 +644,7 @@ export default function HomeTab() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar bg-white px-3 py-2.5 space-y-2">
+              <div className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden bg-white px-3 py-2.5 no-scrollbar max-[360px]:px-2.5">
                 <DirectionToggle
                   value={parsedData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
                   onChange={(nextType) => setParsedData({...parsedData, type: nextType, isIncome: nextType === 'INCOME'})}
@@ -672,12 +726,12 @@ export default function HomeTab() {
                 />
               </div>
 
-              <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-2.5">
+              <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-2.5 max-[360px]:px-2.5">
                 <div className="flex gap-2.5">
                   <button
                     type="button"
                     onClick={() => setShowBottomSheet(false)}
-                    className="h-12 w-20 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 active:scale-[0.98] transition-all"
+                    className="h-12 w-20 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 active:scale-[0.98] transition-all max-[360px]:w-16"
                   >
                     취소
                   </button>
@@ -685,11 +739,71 @@ export default function HomeTab() {
                     type="button"
                     onClick={() => handleSave(parsedData)}
                     disabled={!parsedData.targetName?.trim()}
-                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all ${!parsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
+                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all max-[360px]:text-[15px] ${!parsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
                   >
                     저장하기
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {monthEntryFilter && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMonthEntryFilter(null)}
+              className="fixed inset-0 z-[80] bg-black/40"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+              className="fixed bottom-0 left-1/2 z-[90] flex max-h-[82dvh] w-full max-w-[430px] -translate-x-1/2 flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl"
+            >
+              <div className="shrink-0 border-b border-gray-100 px-5 pb-4 pt-2">
+                <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-gray-300" />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-black text-blue-600">이번 달 경조사 내역</p>
+                    <h3 className="mt-1 text-[19px] font-black leading-tight text-gray-950">{monthSheetTitle}</h3>
+                    <p className={`mt-1 text-[14px] font-black tabular-nums ${monthSheetTone}`}>{monthSheetAmount}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMonthEntryFilter(null)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-all"
+                    aria-label="닫기"
+                  >
+                    <CloseIcon size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-3 no-scrollbar">
+                {visibleMonthEntries.length > 0 ? (
+                  <div className="overflow-hidden rounded-[20px] border border-gray-100 bg-white shadow-sm">
+                    {visibleMonthEntries.map((entry, index) => (
+                      <RecentEntryRow
+                        key={entry.id}
+                        entry={entry}
+                        isLast={index === visibleMonthEntries.length - 1}
+                        onClick={() => setSelectedEntry(entry)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[20px] border border-dashed border-gray-200 bg-white px-5 py-8 text-center">
+                    <p className="text-[13px] font-bold text-gray-500">이번 달 내역이 없어요</p>
+                    <p className="mt-1 text-[11px] text-gray-400">기록을 추가하면 여기에서 바로 확인할 수 있어요</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </>
@@ -711,7 +825,7 @@ export default function HomeTab() {
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-1">계좌번호</p>
-                  <p className="text-sm font-bold text-gray-800">{savedAccount}</p>
+                  <p className="break-all text-sm font-bold text-gray-800">{savedAccount}</p>
                 </div>
                 <div className="flex space-x-2 pt-2">
                   <button onClick={() => setShowTransferModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm active:scale-95 transition-all">
@@ -753,46 +867,55 @@ export default function HomeTab() {
         onClose={() => setAdPromptOpen(false)}
         rewardType="AI_CREDIT"
       />
+      <EntryEditSheet entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </div>
   );
 }
 
-function SummaryTile({ label, value, suffix, tone }: { label: string; value: string; suffix: string; tone: 'blue' | 'red' }) {
+function SummaryTile({ label, value, suffix, tone, onClick }: { label: string; value: string; suffix: string; tone: 'blue' | 'red'; onClick: () => void }) {
   const toneClass = tone === 'blue'
     ? { text: 'text-blue-600' }
     : { text: 'text-red-500' };
 
   return (
-    <div className="min-w-0 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-      <p className="truncate text-[10px] font-bold text-gray-400">{label}</p>
-      <p className={`mt-2.5 whitespace-nowrap text-[17px] leading-none font-black tracking-tight ${toneClass.text}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-w-0 rounded-2xl border border-gray-100 bg-white px-2.5 py-3 text-left shadow-sm transition-all active:scale-[0.98] active:bg-gray-50 max-[360px]:px-2"
+    >
+      <p className="whitespace-nowrap text-[10px] font-bold text-gray-400 max-[360px]:text-[9px]">{label}</p>
+      <p className={`mt-2.5 whitespace-nowrap text-[16px] leading-none font-black tabular-nums max-[360px]:text-[14px] ${toneClass.text}`}>
         {value}<span className="text-[10px] font-bold text-gray-500">{suffix}</span>
       </p>
-    </div>
+    </button>
   );
 }
 
-function RecentEntryRow({ entry, isLast }: { entry: EventEntry; isLast: boolean }) {
+function RecentEntryRow({ entry, isLast, onClick }: { entry: EventEntry; isLast: boolean; onClick: () => void }) {
   const isIncome = entry.type === 'INCOME';
-  const amountLabel = `${isIncome ? '+' : '-'}${formatMan(entry.amount)}`;
+  const amountLabel = `${isIncome ? '+' : '-'}${formatAmountMan(entry.amount)}`;
   const detailLabel = entry.eventType === 'other' && entry.customEventName ? entry.customEventName : eventLabel(entry.eventType);
 
   return (
-    <div className={`flex items-center justify-between gap-3 px-4 py-3.5 ${!isLast ? 'border-b border-gray-100' : ''}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 max-[360px]:px-3 ${!isLast ? 'border-b border-gray-100' : ''}`}
+    >
       <div className="flex min-w-0 items-center gap-3">
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isIncome ? 'bg-blue-50' : 'bg-red-50'}`}>
           {eventIcon(entry.eventType, 14)}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-tight text-gray-900">{entry.targetName || '이름 없음'}</p>
+          <p className="truncate text-sm font-bold leading-tight text-gray-900 max-[360px]:text-[13px]">{entry.targetName || '이름 없음'}</p>
           <p className="mt-0.5 truncate text-[10px] font-medium text-gray-400">{detailLabel} · {formatEntryDate(entry.date)}</p>
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className={`text-sm font-black leading-tight ${isIncome ? 'text-blue-600' : 'text-red-500'}`}>{amountLabel}</p>
+        <p className={`text-sm font-black leading-tight max-[360px]:text-[13px] ${isIncome ? 'text-blue-600' : 'text-red-500'}`}>{amountLabel}</p>
         <p className="mt-0.5 text-[9px] font-medium text-gray-300">{isIncome ? '받음' : '보냄'}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -811,7 +934,7 @@ function DirectionToggle({ value, onChange }: { value: 'INCOME' | 'EXPENSE'; onC
         <button
           type="button"
           onClick={() => onChange('EXPENSE')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] ${
+          className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] max-[360px]:gap-1 max-[360px]:text-[11px] ${
             value === 'EXPENSE'
               ? 'bg-white text-red-500 shadow-sm ring-1 ring-red-100'
               : 'text-gray-500'
@@ -823,7 +946,7 @@ function DirectionToggle({ value, onChange }: { value: 'INCOME' | 'EXPENSE'; onC
         <button
           type="button"
           onClick={() => onChange('INCOME')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] ${
+          className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-xl text-xs font-black transition-all active:scale-[0.98] max-[360px]:gap-1 max-[360px]:text-[11px] ${
             value === 'INCOME'
               ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-100'
               : 'text-gray-500'
@@ -840,9 +963,9 @@ function DirectionToggle({ value, onChange }: { value: 'INCOME' | 'EXPENSE'; onC
 function ReviewDateField({ label, value, ai = false, onChange }: { label: string; value?: string; ai?: boolean; onChange: (value: string) => void }) {
   const displayValue = formatSheetDate(value);
   return (
-    <div className={`relative rounded-2xl border px-3.5 py-3 ${ai ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50'}`}>
-      <div className="flex min-h-6 items-center gap-2.5">
-        <span className="w-9 shrink-0 text-[11px] font-black text-gray-500">{label}</span>
+    <div className={`relative rounded-2xl border px-3.5 py-3 max-[360px]:px-2.5 ${ai ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50'}`}>
+      <div className="flex min-h-6 items-center gap-2.5 max-[360px]:gap-2">
+        <span className="w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8">{label}</span>
         <span className="min-w-0 flex-1 truncate text-[15px] font-black text-gray-950">
           {displayValue || '날짜 선택'}
         </span>
@@ -862,9 +985,9 @@ function ReviewDateField({ label, value, ai = false, onChange }: { label: string
 function EventTypeSelector({ value, ai = false, initialValue, onChange }: { value: EventType; ai?: boolean; initialValue?: EventType; onChange: (value: EventType) => void }) {
   const inferredLabel = eventLabel(initialValue || value);
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3 max-[360px]:px-2.5">
       <p className="text-[11px] font-black text-gray-500">종류</p>
-      <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+      <div className="mt-2.5 grid grid-cols-4 gap-1.5 max-[360px]:gap-1">
         {eventOptions.map(({ value: optionValue, label, Icon }) => {
           const isSelected = optionValue === value;
           return (
@@ -872,7 +995,7 @@ function EventTypeSelector({ value, ai = false, initialValue, onChange }: { valu
               key={optionValue}
               type="button"
               onClick={() => onChange(optionValue)}
-              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border bg-white text-[11px] font-black transition-all active:scale-[0.98] ${
+              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border bg-white text-[11px] font-black transition-all active:scale-[0.98] max-[360px]:h-[52px] ${
                 isSelected
                   ? 'border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-100'
                   : 'border-gray-200 text-gray-500'
@@ -898,7 +1021,7 @@ function EventTypeSelector({ value, ai = false, initialValue, onChange }: { valu
 function AmountReviewCard({ amount, reason, ai = false, onChange }: { amount?: number; reason?: string; ai?: boolean; onChange: (amount: number) => void }) {
   const value = Number(amount) || 0;
   return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 px-3.5 py-3.5">
+    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 px-3.5 py-3.5 max-[360px]:px-2.5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] font-black text-blue-600">금액</p>
         {ai && (
@@ -911,31 +1034,30 @@ function AmountReviewCard({ amount, reason, ai = false, onChange }: { amount?: n
       <div className="mt-2 flex items-end gap-2 overflow-hidden">
         <input
           type="text"
-          inputMode="numeric"
-          value={value ? value.toLocaleString() : ''}
+          inputMode="decimal"
+          value={formatManInputValue(value)}
           onChange={(e) => {
-            const raw = e.target.value.replace(/[^0-9]/g, '');
-            onChange(Number(raw) || 0);
+            onChange(parseManInputToWon(e.target.value));
           }}
           placeholder="0"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-[30px] leading-none font-black tracking-tight text-gray-950 outline-none placeholder:text-gray-300"
+          className="min-w-0 flex-1 bg-transparent text-right text-[30px] leading-none font-black text-gray-950 outline-none placeholder:text-gray-300 max-[360px]:text-[26px]"
         />
-        <span className="mb-0.5 shrink-0 text-[15px] font-black text-gray-500">원</span>
+        <span className="mb-0.5 shrink-0 text-[15px] font-black text-gray-500">만</span>
       </div>
       {reason && (
         <p className="mt-2 text-xs leading-snug font-bold text-blue-500">"{reason}"</p>
       )}
-      <div className="mt-3 grid grid-cols-4 gap-1.5">
+      <div className="mt-3 grid grid-cols-4 gap-1.5 max-[360px]:gap-1">
         {[{ l: '-1만', d: -10000 }, { l: '+1만', d: 10000 }, { l: '+5만', d: 50000 }, { l: '+10만', d: 100000 }].map((button) => (
           <button
             key={button.l}
             type="button"
             onClick={() => onChange(Math.max(0, value + button.d))}
-            className="h-9 min-w-0 rounded-xl border border-blue-200 bg-white text-xs font-black text-blue-700 transition-all active:scale-[0.98]"
+            className="h-9 min-w-0 rounded-xl border border-blue-200 bg-white text-xs font-black text-blue-700 transition-all active:scale-[0.98] max-[360px]:text-[10px]"
           >
             {button.l}
           </button>
@@ -951,7 +1073,7 @@ function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChan
     .filter((item: any) => item.account);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3 max-[360px]:px-2.5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-black text-gray-500">계좌번호</p>
         {ai && <AiPill />}
@@ -966,13 +1088,13 @@ function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChan
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-[13px] font-black text-gray-950 outline-none placeholder:text-gray-300"
+          className="min-w-0 flex-1 bg-transparent text-[13px] font-black text-gray-950 outline-none placeholder:text-gray-300 max-[360px]:text-[12px]"
         />
         {account.trim() && (
           <button
             type="button"
             onClick={() => onCopy(account)}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-black text-gray-700 transition-all active:scale-95"
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 text-[11px] font-black text-gray-700 transition-all active:scale-95 max-[360px]:gap-1 max-[360px]:px-1.5 max-[360px]:text-[10px]"
           >
             <Copy size={16} />
             <span>복사</span>
@@ -988,7 +1110,7 @@ function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChan
                 key={`${item.account}-${index}`}
                 type="button"
                 onClick={() => onChange(item.account)}
-                className={`rounded-xl border px-3 py-2 text-xs font-black transition-all active:scale-95 ${
+                className={`max-w-full break-all rounded-xl border px-3 py-2 text-left text-xs font-black transition-all active:scale-95 ${
                   isSelected
                     ? 'border-blue-600 bg-blue-600 text-white'
                     : 'border-blue-100 bg-white text-blue-600'
@@ -1055,7 +1177,7 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
   const contactSuggestions = contacts.filter((c: any) => c.name.toLowerCase().includes((localValue || '').toLowerCase()));
   const isBlue = tone ? tone === 'blue' : ai;
   const fieldClass = isBlue ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50';
-  const inputClass = 'min-w-0 flex-1 bg-transparent text-sm font-black leading-snug text-gray-950 outline-none placeholder:text-gray-300';
+  const inputClass = 'min-w-0 flex-1 bg-transparent text-[14px] font-black leading-snug text-gray-950 outline-none placeholder:text-gray-300 max-[360px]:text-[13px]';
   const shouldAutoFit = fitToWidth && type === 'text';
 
   React.useLayoutEffect(() => {
@@ -1098,9 +1220,9 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
 
   return (
     <div className="relative">
-      <div className={`rounded-2xl border px-3.5 py-3 ${fieldClass}`}>
-        <div className="flex min-h-6 items-center gap-2.5">
-          <label className="w-9 shrink-0 text-[11px] font-black text-gray-500">{label}</label>
+      <div className={`rounded-2xl border px-3.5 py-3 max-[360px]:px-2.5 ${fieldClass}`}>
+        <div className="flex min-h-6 items-center gap-2.5 max-[360px]:gap-2">
+          <label className="w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8">{label}</label>
       {type === 'select' ? (
             <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
           {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
@@ -1126,7 +1248,7 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
                   key={`${suggestion.name}-${index}`}
                   type="button"
                   onClick={() => onChange(suggestion.name)}
-                  className={`rounded-lg border px-2 py-1.5 text-[11px] font-black transition-all active:scale-95 ${
+                  className={`max-w-full break-all rounded-lg border px-2 py-1.5 text-left text-[11px] font-black transition-all active:scale-95 ${
                     isSelected
                       ? 'border-blue-600 bg-blue-600 text-white'
                       : 'border-blue-100 bg-white text-blue-600'

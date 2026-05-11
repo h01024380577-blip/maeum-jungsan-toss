@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { parseBulkAmount } from '@/src/lib/bulkEntryDedup';
 
 export interface RawCSVData {
   headers: { name: string; index: number }[];
@@ -39,14 +40,7 @@ export const parseCSVFile = (file: File): Promise<RawCSVData> => {
 };
 
 export const cleanAmount = (value: any): number => {
-  if (typeof value === 'number') return Math.abs(value);
-  if (!value || typeof value !== 'string') return 0;
-  
-  // Remove non-numeric characters except digits
-  const numericString = value.replace(/[^0-9]/g, '');
-  const amount = parseInt(numericString, 10);
-  
-  return isNaN(amount) ? 0 : Math.abs(amount);
+  return parseBulkAmount(value);
 };
 
 export const normalizeEventType = (value: any): 'wedding' | 'funeral' | 'birthday' | 'other' => {

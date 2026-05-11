@@ -20,9 +20,10 @@ import {
   Tooltip,
 } from 'recharts';
 import { ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react';
+import { formatAmountMan, formatSignedAmountMan } from '@/src/utils/amountFormat';
 
-const BLUE = ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8'];
-const RED = ['#ef4444', '#f87171', '#fca5a5', '#dc2626', '#b91c1c'];
+const INCOME_COLORS = ['#2563eb', '#059669', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
+const EXPENSE_COLORS = ['#dc2626', '#f97316', '#7c3aed', '#0d9488', '#2563eb', '#db2777', '#ca8a04'];
 
 const eventLabel = (n: string) =>
   n === 'wedding' ? '결혼' : n === 'funeral' ? '부고' : n === 'birthday' ? '생일' : n === 'other' ? '기타' : n;
@@ -32,7 +33,7 @@ export default function StatsOverview() {
   const [tab, setTab] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
 
   const filtered = entries.filter((e) => e.type === tab);
-  const colors = tab === 'INCOME' ? BLUE : RED;
+  const colors = tab === 'INCOME' ? INCOME_COLORS : EXPENSE_COLORS;
 
   const totalIncome = entries.filter((e) => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
   const totalExpense = entries.filter((e) => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
@@ -63,16 +64,14 @@ export default function StatsOverview() {
           <ArrowDownLeft size={14} className="text-blue-500 mx-auto mb-1" />
           <p className="text-[10px] font-bold text-blue-400">받은 마음</p>
           <p className="text-base font-black text-blue-600">
-            {(totalIncome / 10000).toFixed(0)}
-            <span className="text-[10px] text-blue-400">만</span>
+            {formatAmountMan(totalIncome)}
           </p>
         </div>
         <div className="bg-red-50 rounded-2xl p-3.5 text-center">
           <ArrowUpRight size={14} className="text-red-400 mx-auto mb-1" />
           <p className="text-[10px] font-bold text-red-400">보낸 마음</p>
           <p className="text-base font-black text-red-500">
-            {(totalExpense / 10000).toFixed(0)}
-            <span className="text-[10px] text-red-400">만</span>
+            {formatAmountMan(totalExpense)}
           </p>
         </div>
         <div className="bg-white rounded-2xl p-3.5 text-center border border-gray-100">
@@ -83,9 +82,7 @@ export default function StatsOverview() {
               balance >= 0 ? 'text-blue-600' : 'text-red-500'
             }`}
           >
-            {balance >= 0 ? '+' : ''}
-            {(balance / 10000).toFixed(0)}
-            <span className="text-[10px] text-gray-400">만</span>
+            {formatSignedAmountMan(balance)}
           </p>
         </div>
       </div>
@@ -130,11 +127,16 @@ export default function StatsOverview() {
                     dataKey="value"
                   >
                     {byEventType.map((_, i) => (
-                      <Cell key={i} fill={colors[i % colors.length]} />
+                      <Cell
+                        key={i}
+                        fill={colors[i % colors.length]}
+                        stroke="#ffffff"
+                        strokeWidth={3}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(v) => `${Number(v).toLocaleString()}원`}
+                    formatter={(v) => formatAmountMan(Number(v))}
                     contentStyle={{
                       borderRadius: '12px',
                       border: 'none',
@@ -179,7 +181,7 @@ export default function StatsOverview() {
                   />
                   <Tooltip
                     cursor={{ fill: '#f8fafc' }}
-                    formatter={(v) => [`${Number(v).toLocaleString()}원`, '합계']}
+                    formatter={(v) => [formatAmountMan(Number(v)), '합계']}
                     contentStyle={{
                       borderRadius: '12px',
                       border: 'none',
@@ -187,12 +189,11 @@ export default function StatsOverview() {
                       fontSize: '12px',
                     }}
                   />
-                  <Bar
-                    dataKey="value"
-                    fill={tab === 'INCOME' ? '#3b82f6' : '#ef4444'}
-                    radius={[0, 10, 10, 0]}
-                    barSize={20}
-                  />
+                  <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={20}>
+                    {byRelation.map((_, i) => (
+                      <Cell key={i} fill={colors[i % colors.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -223,7 +224,7 @@ export default function StatsOverview() {
                       tab === 'INCOME' ? 'text-blue-600' : 'text-red-500'
                     }`}
                   >
-                    {item.value.toLocaleString()}원
+                    {formatAmountMan(item.value)}
                   </p>
                   <p className="text-[9px] text-gray-300">
                     {total > 0 ? Math.round((item.value / total) * 100) : 0}%

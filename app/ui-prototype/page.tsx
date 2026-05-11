@@ -38,9 +38,9 @@ const screenNotes = [
 ];
 
 const recentRecords = [
-  { name: '최유진', event: '결혼', date: '오늘', amount: '-100,000', tone: 'sent' },
-  { name: '박선우', event: '부고', date: '내일', amount: '-50,000', tone: 'solemn' },
-  { name: '정다은', event: '돌잔치', date: '지난주', amount: '+100,000', tone: 'received' },
+  { name: '최유진', event: '결혼', date: '오늘', amount: '-10만', tone: 'sent' },
+  { name: '박선우', event: '부고', date: '내일', amount: '-5만', tone: 'solemn' },
+  { name: '정다은', event: '돌잔치', date: '지난주', amount: '+10만', tone: 'received' },
 ];
 
 const calendarDays = Array.from({ length: 35 }, (_, index) => index + 1);
@@ -269,7 +269,7 @@ function AnalyzeSketch() {
           <InfoBlock label="날짜" value="2026.05.18" />
           <InfoBlock label="장소" value="더채플앳청담" />
         </div>
-        <AmountBox tone="blue" label="추천 금액" value="100,000" />
+        <AmountBox tone="blue" label="추천 금액" value="10만" />
         <div className="mt-3 grid grid-cols-2 gap-2">
           <InfoBlock label="관계" value="친구" />
           <InfoBlock label="계좌" value="신한 110" />
@@ -296,7 +296,7 @@ function FuneralSketch() {
             <InfoBlock label="발인" value="5월 18일 07:00" />
             <InfoBlock label="상주" value="박민재" />
           </div>
-          <AmountBox tone="zinc" label="전할 마음" value="50,000" />
+          <AmountBox tone="zinc" label="전할 마음" value="5만" />
           <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
             <p className="text-xs font-bold text-zinc-400">메모</p>
             <p className="mt-1 text-sm font-semibold text-zinc-700">방문 전 연락, 조의금 계좌 확인</p>
@@ -352,8 +352,8 @@ function CalendarSketch() {
           <section>
             <p className="text-sm font-black text-slate-900">5월 18일 일정</p>
             <div className="mt-2 space-y-2">
-              <ScheduleRow icon={Heart} title="김민수 · 이서연" meta="결혼 · 더채플앳청담" amount="-100,000" />
-              <ScheduleRow icon={Flower2} title="故 박영수님" meta="부고 · 서울대병원" amount="-50,000" muted />
+              <ScheduleRow icon={Heart} title="김민수 · 이서연" meta="결혼 · 더채플앳청담" amount="-10만" />
+              <ScheduleRow icon={Flower2} title="故 박영수님" meta="부고 · 서울대병원" amount="-5만" muted />
             </div>
           </section>
         </div>
@@ -372,10 +372,10 @@ function HistorySketch() {
           <SearchBox placeholder="이름, 행사, 장소, 관계 검색" />
           <Segmented labels={['전체', '보낸 마음', '받은 마음']} active={1} />
           <div className="space-y-2">
-            <HistoryRow title="최유진" meta="오늘 · 결혼 · 라움" amount="-100,000" />
-            <HistoryRow title="박선우" meta="내일 · 부고 · 서울대병원" amount="-50,000" muted />
-            <HistoryRow title="정다은" meta="지난주 · 돌잔치 · 가족" amount="+100,000" received />
-            <HistoryRow title="한지우" meta="5.22 · 생일 · 친구" amount="-30,000" />
+            <HistoryRow title="최유진" meta="오늘 · 결혼 · 라움" amount="-10만" />
+            <HistoryRow title="박선우" meta="내일 · 부고 · 서울대병원" amount="-5만" muted />
+            <HistoryRow title="정다은" meta="지난주 · 돌잔치 · 가족" amount="+10만" received />
+            <HistoryRow title="한지우" meta="5.22 · 생일 · 친구" amount="-3만" />
           </div>
         </div>
       </div>
@@ -408,10 +408,10 @@ function ContactsSketch() {
               </button>
             ))}
           </div>
-          <ContactRow name="최유진" relation="친구 · 3건" amount="-120,000" favorite />
-          <ContactRow name="정다은" relation="동료 · 2건" amount="+100,000" />
-          <ContactRow name="박선우" relation="지인 · 1건" amount="-50,000" muted />
-          <ContactRow name="한지우" relation="가족 · 4건" amount="+30,000" />
+          <ContactRow name="최유진" relation="친구 · 3건" amount="-12만" favorite />
+          <ContactRow name="정다은" relation="동료 · 2건" amount="+10만" />
+          <ContactRow name="박선우" relation="지인 · 1건" amount="-5만" muted />
+          <ContactRow name="한지우" relation="가족 · 4건" amount="+3만" />
         </div>
       </div>
       <button
@@ -440,7 +440,7 @@ function ContactDetailSketch() {
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-black text-slate-400">마음 흐름</p>
-          <p className="mt-2 text-3xl font-black text-blue-700">-120,000</p>
+          <p className="mt-2 text-3xl font-black text-blue-700">-12만</p>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full w-[68%] rounded-full bg-blue-600" />
           </div>
@@ -449,8 +449,8 @@ function ContactDetailSketch() {
             <span>받은 마음 8만</span>
           </div>
         </div>
-        <HistoryRow title="결혼" meta="2026.05.18 · 라움" amount="-100,000" />
-        <HistoryRow title="생일" meta="2026.03.02 · 메모 있음" amount="-20,000" />
+        <HistoryRow title="결혼" meta="2026.05.18 · 라움" amount="-10만" />
+        <HistoryRow title="생일" meta="2026.03.02 · 메모 있음" amount="-2만" />
       </div>
     </div>
   );
@@ -576,7 +576,7 @@ function HomeMethodPanel({ method, onAnalyze }: { method: HomeInputMethod; onAna
           <MiniField label="이름" value="김민수 · 이서연" />
           <MiniField label="행사" value="결혼" />
           <MiniField label="날짜" value="5월 18일" />
-          <MiniField label="금액" value="100,000원" />
+          <MiniField label="금액" value="10만" />
         </div>
         <button type="button" onClick={onAnalyze} className="mt-3 h-10 w-full rounded-md bg-slate-900 text-xs font-black text-white">
           입력 내용 확인
@@ -634,7 +634,7 @@ function HomeResultSheet({ method, onClose }: { method: HomeInputMethod; onClose
           <InfoBlock label="장소" value="더채플앳청담" />
           <InfoBlock label="계좌" value="신한 110" />
         </div>
-        <AmountBox tone="blue" label="추천 금액" value="100,000" />
+        <AmountBox tone="blue" label="추천 금액" value="10만" />
         <button type="button" onClick={onClose} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-base font-black text-white">
           <Check size={18} />
           기록 저장하기
@@ -753,7 +753,6 @@ function AmountBox({ tone, label, value }: { tone: 'blue' | 'zinc'; label: strin
       </div>
       <div className="mt-2 flex items-end gap-1">
         <p className={`text-3xl font-black ${isBlue ? 'text-blue-700' : 'text-zinc-900'}`}>{value}</p>
-        <span className="pb-1 text-sm font-bold text-slate-500">원</span>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-1.5">
         {['-1만', '+1만', '+5만', '+10만'].map((item) => (
