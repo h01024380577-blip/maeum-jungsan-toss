@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import EntryEditSheet from '../components/EntryEditSheet';
 import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
+import { normalizeImageDataUri } from '../utils/imageDataUri';
 
 
 
@@ -119,28 +120,12 @@ type TossPermissionFunction = {
   openPermissionDialog?: () => Promise<TossPermissionStatus>;
 };
 
-type TossImageResponse = {
-  dataUri?: string | null;
-  base64?: string | null;
-};
-
 async function ensureTossPermission(fn: TossPermissionFunction): Promise<boolean> {
   const current = await fn.getPermission?.().catch(() => null);
   if (!current || current === 'allowed') return true;
   if (current === 'denied') return false;
   const next = await fn.openPermissionDialog?.().catch(() => null);
   return next === 'allowed';
-}
-
-function normalizeImageDataUri(image?: TossImageResponse | null): string | null {
-  const raw = image?.dataUri || image?.base64;
-  if (typeof raw !== 'string') return null;
-
-  const value = raw.trim();
-  if (!value) return null;
-  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return value;
-
-  return `data:image/jpeg;base64,${value}`;
 }
 
 const eventIcon = (t: string, size = 14) => {
@@ -247,7 +232,15 @@ export default function HomeTab() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => { const b64 = reader.result as string; setSelectedImage(b64); handleParse({ type: 'image', data: b64 }); };
+      reader.onloadend = () => {
+        const imageData = normalizeImageDataUri(reader.result as string | null);
+        if (!imageData) {
+          toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+          return;
+        }
+        setSelectedImage(imageData);
+        handleParse({ type: 'image', data: imageData });
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -260,7 +253,7 @@ export default function HomeTab() {
         toast.error('카메라 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      const result: TossImageResponse = await openCamera({ base64: true, maxWidth: 1024 });
+      const result = await openCamera({ base64: true, maxWidth: 1024 });
       const imageData = normalizeImageDataUri(result);
       if (!imageData) {
         toast.error('사진을 가져오지 못했어요. 다시 촬영해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
@@ -281,7 +274,7 @@ export default function HomeTab() {
         toast.error('사진 접근 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      const result: TossImageResponse[] = await fetchAlbumPhotos({ maxCount: 1, base64: true, maxWidth: 1024 });
+      const result = await fetchAlbumPhotos({ maxCount: 1, base64: true, maxWidth: 1024 });
       const imageData = normalizeImageDataUri(result?.[0]);
       if (!imageData) {
         toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
