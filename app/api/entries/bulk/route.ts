@@ -8,8 +8,9 @@ import {
   isGuardEnabled,
 } from '@/src/lib/credits';
 import {
+  buildExistingBulkDuplicateKeys,
   buildBulkDuplicateKey,
-  dateFromBulkDateKey,
+  bulkDateSearchWindow,
   normalizeBulkEventType,
   normalizeBulkName,
   parseBulkAmount,
@@ -122,44 +123,33 @@ export async function POST(req: NextRequest) {
         uniqueEntries.push(entry);
       }
 
-      // Contact name 목록에 대해 한 번에 조회
-      const dateKeys = Array.from(new Set(uniqueEntries.map((entry) => entry.dateKey))).sort();
-      const startDate = dateFromBulkDateKey(dateKeys[0]);
-      const endDate = dateFromBulkDateKey(dateKeys[dateKeys.length - 1]);
-      endDate.setUTCHours(23, 59, 59, 999);
-      const existingEvents = dateKeys.length > 0
+      const dateWindow = bulkDateSearchWindow(uniqueEntries.map((entry) => entry.dateKey));
+      const incomingFingerprints = uniqueEntries.map((entry) => entry.importFingerprint);
+      const existingEvents = dateWindow
         ? await tx.event.findMany({
           where: {
             userId,
-            date: {
-              gte: startDate,
-              lte: endDate,
-            },
+            OR: [
+              { importFingerprint: { in: incomingFingerprints } },
+              {
+                date: {
+                  gte: dateWindow.startDate,
+                  lte: dateWindow.endDate,
+                },
+              },
+            ],
           },
-          include: {
+          select: {
+            targetName: true,
+            date: true,
+            importFingerprint: true,
             transactions: {
-              take: 1,
-              orderBy: { createdAt: 'desc' },
               select: { type: true, amount: true },
             },
           },
         })
         : [];
-      const existingKeys = new Set(
-        existingEvents.flatMap((event) => {
-          const tx = event.transactions[0];
-          if (!tx) return [];
-          return [
-            event.importFingerprint,
-            buildBulkDuplicateKey({
-              targetName: event.targetName,
-              amount: tx.amount,
-              date: event.date,
-              type: tx.type,
-            }),
-          ].filter((key): key is string => typeof key === 'string' && key.length > 0);
-        }),
-      );
+      const existingKeys = buildExistingBulkDuplicateKeys(existingEvents);
       const entriesToInsert = uniqueEntries.filter((entry) => {
         const isDuplicate = existingKeys.has(entry.importFingerprint);
         if (isDuplicate) skipped += 1;
@@ -195,8 +185,8 @@ export async function POST(req: NextRequest) {
       let inserted = 0;
       for (const entry of entriesToInsert) {
         const contactId = contactByName.get(normalizeBulkName(entry.targetName))!;
-        const event = await tx.event.create({
-          data: {
+        const created = await tx.event.createMany({
+          data: [{
             userId,
             contactId,
             eventType: entry.eventType,
@@ -207,6 +197,20 @@ export async function POST(req: NextRequest) {
             memo: entry.memo,
             account: entry.account,
             importFingerprint: entry.importFingerprint,
+          }],
+          skipDuplicates: true,
+        });
+        if (created.count === 0) {
+          skipped += 1;
+          continue;
+        }
+
+        const event = await tx.event.findUniqueOrThrow({
+          where: {
+            userId_importFingerprint: {
+              userId,
+              importFingerprint: entry.importFingerprint,
+            },
           },
           select: { id: true },
         });

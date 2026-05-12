@@ -214,11 +214,15 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       const result = await bulkAddEntries(processed as any);
       if (result.inserted > 0) {
         toast.success(`${result.inserted}건을 가져왔어요`, {
-          description: result.skipped > 0 ? `${result.skipped}건은 중복으로 건너뛰었어요.` : undefined,
+          description: result.skipped > 0
+            ? `총 ${result.attempted}건 중 중복 ${result.skipped}건은 제외했어요.`
+            : `총 ${result.attempted}건을 모두 저장했어요.`,
         });
       } else {
         toast.info('새로 가져올 내역이 없어요', {
-          description: result.skipped > 0 ? `${result.skipped}건은 중복으로 건너뛰었어요.` : undefined,
+          description: result.skipped > 0
+            ? `총 ${result.attempted}건이 기존 내역 또는 파일 안 중복이었어요.`
+            : undefined,
         });
       }
       setError(null);
@@ -519,12 +523,12 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                 <div className="p-4 bg-blue-50 rounded-2xl flex items-start space-x-3">
                   <Check className="text-blue-600 mt-0.5" size={18} />
                   <p className="text-xs text-blue-700 leading-relaxed">
-                    총 <span className="font-bold">{totalCount}건</span>의 데이터를 가져옵니다.
+                    총 <span className="font-bold">{totalCount}건</span>을 확인했어요.
                     {importMode === 'backup' && (
                       <> (받은 마음 <span className="font-bold text-blue-700">{incomeCount}건</span> · 보낸 마음 <span className="font-bold text-red-600">{expenseCount}건</span>)</>
                     )}
                     <br />
-                    중복 내역은 저장하지 않고 자동으로 건너뜁니다.
+                    저장할 때 기존 내역과 파일 안 중복은 자동으로 제외합니다.
                   </p>
                 </div>
 

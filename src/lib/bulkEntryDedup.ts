@@ -3,6 +3,17 @@ export type BulkEventType = 'WEDDING' | 'FUNERAL' | 'BIRTHDAY' | 'OTHER';
 
 const BULK_DUPLICATE_SEPARATOR = '\u001f';
 const MAN_UNIT_THRESHOLD = 1000;
+const BULK_DATE_SEARCH_BUFFER_DAYS = 1;
+
+export type ExistingBulkDuplicateEvent = {
+  targetName: string;
+  date: Date;
+  importFingerprint?: string | null;
+  transactions?: Array<{
+    amount: number;
+    type: BulkTransactionType;
+  }>;
+};
 
 export function normalizeBulkEventType(raw: unknown): BulkEventType {
   const upper = String(raw ?? '').toUpperCase();
@@ -94,6 +105,38 @@ export function buildBulkDuplicateKey(entry: {
   ].join(BULK_DUPLICATE_SEPARATOR);
 }
 
+export function buildExistingBulkDuplicateKeys(events: ExistingBulkDuplicateEvent[]): Set<string> {
+  const keys = new Set<string>();
+
+  for (const event of events) {
+    if (typeof event.importFingerprint === 'string' && event.importFingerprint.length > 0) {
+      keys.add(event.importFingerprint);
+    }
+
+    for (const transaction of event.transactions ?? []) {
+      keys.add(buildBulkDuplicateKey({
+        targetName: event.targetName,
+        amount: transaction.amount,
+        date: event.date,
+        type: transaction.type,
+      }));
+    }
+  }
+
+  return keys;
+}
+
+export function bulkDateSearchWindow(dateKeys: string[]): { startDate: Date; endDate: Date } | null {
+  if (dateKeys.length === 0) return null;
+
+  const sorted = Array.from(new Set(dateKeys)).sort();
+  const startDate = addUtcDays(dateFromBulkDateKey(sorted[0]), -BULK_DATE_SEARCH_BUFFER_DAYS);
+  const endDate = addUtcDays(dateFromBulkDateKey(sorted[sorted.length - 1]), BULK_DATE_SEARCH_BUFFER_DAYS);
+  endDate.setUTCHours(23, 59, 59, 999);
+
+  return { startDate, endDate };
+}
+
 function matchDateKey(value: string): string | null {
   const matched = value.match(/(\d{2,4})[-./](\d{1,2})[-./](\d{1,2})/);
   if (!matched) return null;
@@ -118,6 +161,12 @@ function parseFallbackDateKey(value: string): string | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return dateKeyInKst(parsed);
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
 }
 
 function dateKeyInKst(date: Date): string {
