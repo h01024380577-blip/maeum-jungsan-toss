@@ -225,6 +225,7 @@ export default function HomeTab() {
     : formatSignedAmountMan(monthBalance);
   const monthSheetTone =
     monthEntryFilter === 'EXPENSE' ? 'text-red-500'
+    : monthEntryFilter === 'ALL' && monthBalance === 0 ? 'text-gray-500'
     : monthEntryFilter === 'ALL' && monthBalance < 0 ? 'text-red-500'
     : 'text-blue-600';
 
@@ -570,7 +571,7 @@ export default function HomeTab() {
               label="합계"
               value={formatSignedAmountMan(monthBalance)}
               suffix=""
-              tone={monthBalance >= 0 ? 'blue' : 'red'}
+              tone={monthBalance === 0 ? 'gray' : monthBalance > 0 ? 'blue' : 'red'}
               onClick={() => setMonthEntryFilter('ALL')}
             />
           </div>
@@ -872,9 +873,11 @@ export default function HomeTab() {
   );
 }
 
-function SummaryTile({ label, value, suffix, tone, onClick }: { label: string; value: string; suffix: string; tone: 'blue' | 'red'; onClick: () => void }) {
+function SummaryTile({ label, value, suffix, tone, onClick }: { label: string; value: string; suffix: string; tone: 'blue' | 'red' | 'gray'; onClick: () => void }) {
   const toneClass = tone === 'blue'
     ? { text: 'text-blue-600' }
+    : tone === 'gray'
+    ? { text: 'text-gray-500' }
     : { text: 'text-red-500' };
 
   return (
