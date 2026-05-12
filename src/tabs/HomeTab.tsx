@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
-import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info, StickyNote } from 'lucide-react';
+import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info, StickyNote } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -699,7 +699,6 @@ export default function HomeTab() {
                 <AmountReviewCard
                   amount={parsedData.amount}
                   reason={parsedData.recommendationReason}
-                  ai={!!initialParsedData}
                   onChange={(amount: number) => setParsedData({...parsedData, amount})}
                 />
 
@@ -1027,51 +1026,74 @@ function EventTypeSelector({ value, ai = false, initialValue, onChange }: { valu
   );
 }
 
-function AmountReviewCard({ amount, reason, ai = false, onChange }: { amount?: number; reason?: string; ai?: boolean; onChange: (amount: number) => void }) {
+function AmountReviewCard({ amount, reason, onChange }: { amount?: number; reason?: string; onChange: (amount: number) => void }) {
   const value = Number(amount) || 0;
+  const displayValue = formatManInputValue(value) || '0';
+  const updateAmount = (delta: number) => onChange(Math.max(0, value + delta));
+
   return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 px-3.5 py-3.5 max-[360px]:px-2.5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] font-black text-blue-600">금액</p>
-        {ai && (
-          <span className="inline-flex h-6 items-center gap-1 rounded-full bg-white px-2 text-[10px] font-black text-blue-600">
-            <Sparkles size={10} />
-            추천
-          </span>
-        )}
+    <div className="rounded-[24px] border border-gray-100 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] max-[360px]:rounded-[22px] max-[360px]:px-3">
+      <p className="text-[13px] font-black text-gray-500">금액</p>
+
+      <div className="mt-3.5 flex items-center justify-between gap-3 max-[360px]:gap-2">
+        <button
+          type="button"
+          onClick={() => updateAmount(-10000)}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-700 transition-all active:scale-95 max-[360px]:h-11 max-[360px]:w-11"
+          aria-label="1만원 줄이기"
+        >
+          <Minus size={21} strokeWidth={2.4} />
+        </button>
+
+        <div className="flex min-w-0 flex-1 items-end justify-center gap-1.5">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={displayValue}
+            onChange={(e) => {
+              onChange(parseManInputToWon(e.target.value));
+            }}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            aria-label="금액"
+            className="min-w-0 max-w-[6ch] bg-transparent text-center text-[36px] font-black leading-none text-gray-950 outline-none tabular-nums max-[380px]:text-[34px] max-[340px]:text-[31px]"
+          />
+          <span className="mb-1 shrink-0 text-[16px] font-black leading-none text-gray-500 max-[360px]:text-[15px]">만원</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => updateAmount(10000)}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-700 transition-all active:scale-95 max-[360px]:h-11 max-[360px]:w-11"
+          aria-label="1만원 늘리기"
+        >
+          <Plus size={22} strokeWidth={2.4} />
+        </button>
       </div>
-      <div className="mt-2 flex items-end gap-2 overflow-hidden">
-        <input
-          type="text"
-          inputMode="decimal"
-          value={formatManInputValue(value)}
-          onChange={(e) => {
-            onChange(parseManInputToWon(e.target.value));
-          }}
-          placeholder="0"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-right text-[30px] leading-none font-black text-gray-950 outline-none placeholder:text-gray-300 max-[360px]:text-[26px]"
-        />
-        <span className="mb-0.5 shrink-0 text-[15px] font-black text-gray-500">만</span>
-      </div>
-      {reason && (
-        <p className="mt-2 text-xs leading-snug font-bold text-blue-500">"{reason}"</p>
-      )}
-      <div className="mt-3 grid grid-cols-4 gap-1.5 max-[360px]:gap-1">
+
+      <div className="mt-5 grid grid-cols-4 gap-2 max-[360px]:mt-4 max-[360px]:gap-1.5">
         {[{ l: '-1만', d: -10000 }, { l: '+1만', d: 10000 }, { l: '+5만', d: 50000 }, { l: '+10만', d: 100000 }].map((button) => (
           <button
             key={button.l}
             type="button"
-            onClick={() => onChange(Math.max(0, value + button.d))}
-            className="h-9 min-w-0 rounded-xl border border-blue-200 bg-white text-xs font-black text-blue-700 transition-all active:scale-[0.98] max-[360px]:text-[10px]"
+            onClick={() => updateAmount(button.d)}
+            className="h-10 min-w-0 rounded-[13px] border border-gray-200 bg-white text-[12px] font-black text-gray-700 transition-all active:scale-[0.98] max-[360px]:h-9 max-[340px]:text-[11px]"
           >
             {button.l}
           </button>
         ))}
       </div>
+
+      {reason && (
+        <div className="mt-5 flex items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-blue-600 max-[360px]:px-3">
+          <Sparkles size={18} className="shrink-0 fill-sky-400 text-sky-400" />
+          <p className="min-w-0 break-keep text-[13px] font-black leading-snug max-[360px]:text-[12px]">
+            {reason}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
