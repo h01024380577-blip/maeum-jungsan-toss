@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { fetchWithRetry, isTokenExpiringSoon, parseScopes, stringifyScopes, TOSS_API_BASE } from '@/src/lib/tossApiClient';
-import { verifyJwt } from '@/src/lib/jwt';
 import { corsResponse, withCors } from '@/src/lib/cors';
+import { getAuthenticatedSessionFromRequest } from '@/src/lib/apiAuth';
 
 async function refreshAccessToken(userId: string): Promise<{ accessToken: string } | null> {
   const user = await prisma.user.findUnique({
@@ -46,17 +46,7 @@ async function refreshAccessToken(userId: string): Promise<{ accessToken: string
 }
 
 export async function GET(req: NextRequest) {
-  // 1순위: Bearer 토큰 (CSR 모드)
-  let userId: string | null = null;
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const jwt = verifyJwt(authHeader.slice(7));
-    if (jwt) userId = jwt.userId;
-  }
-  // 2순위: 쿠키 (하위호환)
-  if (!userId) {
-    userId = req.cookies.get('toss_user_id')?.value ?? null;
-  }
+  const userId = (await getAuthenticatedSessionFromRequest(req))?.userId ?? null;
   if (!userId) return withCors(req, NextResponse.json({ userId: null }, { status: 401 }));
 
   const user = await prisma.user.findUnique({

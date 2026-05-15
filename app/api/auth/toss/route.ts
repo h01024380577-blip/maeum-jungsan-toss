@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { fetchWithRetry, decryptField, parseScopes, stringifyScopes, TOSS_API_BASE } from '@/src/lib/tossApiClient';
 import { signJwt } from '@/src/lib/jwt';
 import { corsResponse, withCors } from '@/src/lib/cors';
+import { AUTH_COOKIE_NAME } from '@/src/lib/apiAuth';
 
 export async function POST(req: NextRequest) {
   let body: { authorizationCode?: string; referrer?: string };
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
       tokenExpiresAt,
       scopes: stringifyScopes(scopes),
     },
-    select: { id: true, createdAt: true },
+    select: { id: true, createdAt: true, sessionVersion: true },
   });
 
   // 파밍 감사 로그: 방금 생성된 계정이면 IP/UA 기록
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
   }
 
   // JWT 발급 (CSR 모드용)
-  const token = signJwt({ userId: user.id, userKey: String(userKey) });
+  const token = signJwt({ userId: user.id, userKey: String(userKey), sessionVersion: user.sessionVersion });
 
   const res = NextResponse.json({ ok: true, userId: user.id, token });
   // 쿠키도 유지 (SSR 하위호환)
@@ -110,8 +111,9 @@ export async function POST(req: NextRequest) {
     sameSite: 'lax' as const,
     maxAge: 60 * 60 * 24 * 14, // refreshToken 유효기간 14일
   };
-  res.cookies.set('toss_user_id', user.id, cookieOpts);
-  res.cookies.set('toss_user_key', String(userKey), cookieOpts);
+  res.cookies.set(AUTH_COOKIE_NAME, token, cookieOpts);
+  res.cookies.delete('toss_user_id');
+  res.cookies.delete('toss_user_key');
   return withCors(req, res);
 }
 

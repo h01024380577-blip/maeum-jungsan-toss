@@ -4,6 +4,7 @@ import { prisma } from '@/src/lib/prisma';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import {
   CREDITS_CONFIG,
+  isAllowedRewardAdGroupId,
   resetAdWatchesIfNeeded,
   resolveDbUserId,
 } from '@/src/lib/credits';
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
   if (!adGroupId) {
     return withCors(req, NextResponse.json({ error: 'missing_ad_group_id' }, { status: 400 }));
   }
+  if (!isAllowedRewardAdGroupId(rewardType, adGroupId)) {
+    return withCors(req, NextResponse.json({ error: 'invalid_ad_group_id' }, { status: 400 }));
+  }
 
   // KST 자정 기준 광고 시청 카운터 리셋
   const { adWatchesToday } = await resetAdWatchesIfNeeded(userId);
@@ -58,12 +62,24 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json({ error: 'cap_reached_csv' }, { status: 409 }));
   }
 
+  const now = new Date();
+  const activeNonceCount = await prisma.adRewardGrant.count({
+    where: {
+      userId,
+      status: 'ISSUED',
+      expiresAt: { gt: now },
+    },
+  });
+  if (activeNonceCount >= CREDITS_CONFIG.ad.activeNonceLimit) {
+    return withCors(req, NextResponse.json({ error: 'active_nonce_limit' }, { status: 429 }));
+  }
+
   const rewardAmount =
     rewardType === 'AI_CREDIT'
       ? CREDITS_CONFIG.ai.rewardAmount
       : CREDITS_CONFIG.csv.rewardAmount;
   const nonce = generateNonce();
-  const expiresAt = new Date(Date.now() + CREDITS_CONFIG.ad.nonceTtlMs);
+  const expiresAt = new Date(now.getTime() + CREDITS_CONFIG.ad.nonceTtlMs);
 
   await prisma.adRewardGrant.create({
     data: {

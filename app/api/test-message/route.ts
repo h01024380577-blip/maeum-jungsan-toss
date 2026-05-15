@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJwt } from '@/src/lib/jwt';
+import { prisma } from '@/src/lib/prisma';
 import { corsResponse, withCors } from '@/src/lib/cors';
+import { getAuthenticatedSessionFromRequest } from '@/src/lib/apiAuth';
 
 const TOSS_API_BASE = 'https://apps-in-toss-api.toss.im';
 
@@ -9,13 +10,16 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  let userKey = req.cookies.get('toss_user_key')?.value;
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const jwt = verifyJwt(authHeader.slice(7));
-    if (jwt) userKey = jwt.userKey;
+  const session = await getAuthenticatedSessionFromRequest(req);
+  if (!session) {
+    return withCors(req, NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 }));
   }
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { tossUserKey: true },
+  });
+  const userKey = user?.tossUserKey;
   if (!userKey) {
     return withCors(req, NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 }));
   }

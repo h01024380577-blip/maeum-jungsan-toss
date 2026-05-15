@@ -18,6 +18,7 @@ model User {
   tokenExpiresAt       DateTime?
   scopes               String? // space-separated scope list
   notificationsEnabled Boolean   @default(false)
+  sessionVersion       Int       @default(0)
 
   // 크레딧 시스템 (2026-04-23 도입)
   aiCredits        Int      @default(5) // AI 분석 영구 잔고, 웰컴 5회
@@ -28,10 +29,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  contacts     Contact[]
-  events       Event[]
-  transactions Transaction[]
-  rewardGrants AdRewardGrant[]
+  contacts      Contact[]
+  events        Event[]
+  transactions  Transaction[]
+  rewardGrants  AdRewardGrant[]
+  paymentOrders PaymentOrder[]
 }
 
 enum RewardType {
@@ -44,6 +46,13 @@ enum GrantStatus {
   REDEEMED
   EXPIRED
   REJECTED
+}
+
+enum PaymentOrderStatus {
+  CREATED
+  EXECUTING
+  EXECUTED
+  FAILED
 }
 
 model AdRewardGrant {
@@ -66,6 +75,24 @@ model AdRewardGrant {
   @@index([rewardNonce])
   @@index([issuedAt])
   @@index([userId, rewardType])
+}
+
+model PaymentOrder {
+  id          String             @id @default(cuid())
+  userId      String
+  orderNo     String             @unique
+  payToken    String             @unique
+  amount      Int
+  productDesc String
+  status      PaymentOrderStatus @default(CREATED)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @default(now()) @updatedAt
+  executedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
 }
 
 model Contact {

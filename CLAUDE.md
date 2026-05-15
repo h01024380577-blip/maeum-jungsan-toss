@@ -41,11 +41,11 @@ When editing API routes, only the EC2 build needs to redeploy. When editing `src
 ### Authentication
 
 Three-tier identity system used by all API routes:
-1. **JWT Bearer token (priority):** `Authorization: Bearer <token>` header. Issued by `POST /api/auth/toss` after Toss OAuth exchange. Custom HS256 implementation in `src/lib/jwt.ts` (14-day expiry, payload: `{ userId, userKey }`). Required for CSR/native WebView mode.
-2. **Cookie fallback:** `toss_user_id` cookie — set alongside JWT for SSR backwards-compatibility.
+1. **JWT Bearer token (priority):** `Authorization: Bearer <token>` header. Issued by `POST /api/auth/toss` after Toss OAuth exchange. Custom HS256 implementation in `src/lib/jwt.ts` (14-day expiry, payload: `{ userId, userKey, sessionVersion }`). Required for CSR/native WebView mode.
+2. **Signed cookie fallback:** `toss_auth_token` httpOnly cookie containing the same signed JWT for SSR backwards-compatibility.
 3. **Guest / device ID:** `x-user-id` request header, populated by `getUserId()` in `src/store/useStore.ts`. Resolution order: `getDeviceId()` from `@apps-in-toss/web-framework` → `localStorage`.
 
-Server-side helper `src/lib/apiAuth.ts` → `getAuthenticatedUserId()` checks Bearer JWT first, then `toss_user_id` cookie. Toss Pay routes also read `toss_user_key` cookie (or JWT's `userKey`) to make Toss Pay API calls on behalf of the user.
+Server-side helper `src/lib/apiAuth.ts` → `getAuthenticatedUserId()` checks Bearer JWT first, then signed `toss_auth_token`; raw `toss_user_id` / `toss_user_key` cookies are not authentication authority. Auth helpers verify `User.sessionVersion`, and Toss Pay / Messenger routes load `tossUserKey` from the DB by authenticated `userId`.
 
 **Toss OAuth flow** (`app/api/auth/toss/route.ts`): authorizationCode → Toss token endpoint → user info (`userKey`, encrypted `name`) → `decryptField()` in `src/lib/tossApiClient.ts` → DB upsert → issue JWT + set cookies.
 
@@ -125,7 +125,7 @@ Vitest (`vitest.config.ts`). Path alias `@` → project root. Test files live al
 Beyond the API routes and tab pages, notable files in `src/`:
 - `src/lib/prisma.ts` — singleton PrismaClient (avoid re-instantiation in API routes)
 - `src/lib/apiClient.ts` — client-side fetch helper that injects auth headers (JWT/`x-user-id`); use this from `src/` instead of bare `fetch`
-- `src/lib/apiAuth.ts` — server-side `getAuthenticatedUserId()` — JWT bearer first, then `toss_user_id` cookie
+- `src/lib/apiAuth.ts` — server-side `getAuthenticatedUserId()` — JWT bearer first, then signed `toss_auth_token` cookie, with `sessionVersion` validation
 - `src/lib/jwt.ts` — custom HS256 sign/verify (no library dependency)
 - `src/lib/cors.ts` — CORS helpers for cross-origin AIT bundle → EC2 calls
 - `src/lib/tossApiClient.ts` — Toss OAuth + `decryptField()` (AES-256-GCM)

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { verifyJwt } from '@/src/lib/jwt';
+import { getAuthenticatedSessionFromRequest } from '@/src/lib/apiAuth';
 import type { RewardType } from '@prisma/client';
 
 const MAX_GUEST_DEVICE_ID_LENGTH = 191;
+const TEST_REWARDED_AD_GROUP_ID = 'ait-ad-test-rewarded-id';
 
 export const CREDITS_CONFIG = {
   ai: {
@@ -21,6 +22,7 @@ export const CREDITS_CONFIG = {
   ad: {
     dailyLimit: Number(process.env.AD_DAILY_LIMIT ?? 10),
     nonceTtlMs: Number(process.env.AD_NONCE_TTL_MS ?? 5 * 60 * 1000),
+    activeNonceLimit: Number(process.env.AD_ACTIVE_NONCE_LIMIT ?? 3),
   },
 } as const;
 
@@ -97,6 +99,25 @@ export function isGuardEnabled(rewardType: RewardType): boolean {
   return rewardType === 'AI_CREDIT'
     ? CREDITS_CONFIG.ai.guardEnabled
     : CREDITS_CONFIG.csv.guardEnabled;
+}
+
+function configuredRewardAdGroupId(rewardType: RewardType): string {
+  return rewardType === 'AI_CREDIT'
+    ? process.env.NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT ?? ''
+    : process.env.NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT ?? '';
+}
+
+export function isAllowedRewardAdGroupId(
+  rewardType: RewardType,
+  adGroupId: string,
+): boolean {
+  const normalized = adGroupId.trim();
+  if (!normalized) return false;
+
+  const configured = configuredRewardAdGroupId(rewardType);
+  if (configured && normalized === configured) return true;
+
+  return process.env.NODE_ENV !== 'production' && normalized === TEST_REWARDED_AD_GROUP_ID;
 }
 
 export function normalizeGuestDeviceId(raw: string | null | undefined): string | null {
@@ -180,13 +201,9 @@ export async function ensureUserRecord(
  * 인증 정보가 전혀 없으면 null.
  */
 export async function resolveDbUserId(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const jwt = verifyJwt(authHeader.slice(7));
-    if (jwt) return jwt.userId;
-  }
-  const cookie = req.cookies.get('toss_user_id')?.value;
-  if (cookie) return cookie;
+  const session = await getAuthenticatedSessionFromRequest(req);
+  if (session) return session.userId;
+
   const deviceId = normalizeGuestDeviceId(req.headers.get('x-user-id'));
   if (deviceId) return ensureUserRecord(deviceId, true);
   return null;

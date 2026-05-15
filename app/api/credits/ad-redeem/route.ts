@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { corsResponse, withCors } from '@/src/lib/cors';
-import { CREDITS_CONFIG, resolveDbUserId } from '@/src/lib/credits';
+import { CREDITS_CONFIG, isAllowedRewardAdGroupId, resolveDbUserId } from '@/src/lib/credits';
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req);
@@ -21,16 +21,41 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const claim = await tx.adRewardGrant.updateMany({
+        where: {
+          rewardNonce: nonce,
+          userId,
+          status: 'ISSUED',
+          expiresAt: { gt: now },
+        },
+        data: { status: 'REDEEMED', redeemedAt: now },
+      });
+
+      if (claim.count !== 1) {
+        const staleGrant = await tx.adRewardGrant.findUnique({ where: { rewardNonce: nonce } });
+        if (!staleGrant) return { success: false as const, reason: 'nonce_not_found' };
+        if (staleGrant.userId !== userId) return { success: false as const, reason: 'nonce_user_mismatch' };
+        if (staleGrant.status !== 'ISSUED') return { success: false as const, reason: 'nonce_already_used' };
+        if (staleGrant.expiresAt <= now) {
+          await tx.adRewardGrant.update({
+            where: { id: staleGrant.id },
+            data: { status: 'EXPIRED' },
+          });
+          return { success: false as const, reason: 'nonce_expired' };
+        }
+        return { success: false as const, reason: 'redeem_state_inconsistent' };
+      }
+
       const grant = await tx.adRewardGrant.findUnique({ where: { rewardNonce: nonce } });
-      if (!grant) throw new Error('nonce_not_found');
-      if (grant.userId !== userId) throw new Error('nonce_user_mismatch');
-      if (grant.status !== 'ISSUED') throw new Error('nonce_already_used');
-      if (grant.expiresAt < new Date()) {
+      if (!grant) throw new Error('nonce_not_found_after_claim');
+
+      if (!isAllowedRewardAdGroupId(grant.rewardType, grant.adGroupId)) {
         await tx.adRewardGrant.update({
           where: { id: grant.id },
-          data: { status: 'EXPIRED' },
+          data: { status: 'REJECTED' },
         });
-        throw new Error('nonce_expired');
+        return { success: false as const, reason: 'invalid_ad_group_id' };
       }
 
       const field = grant.rewardType === 'AI_CREDIT' ? 'aiCredits' : 'csvImportCredits';
@@ -39,54 +64,63 @@ export async function POST(req: NextRequest) {
           ? CREDITS_CONFIG.ai.cap
           : CREDITS_CONFIG.csv.cap;
 
-      // 원자적 increment (cap 미만인 경우에만). cap 도달이면 count===0
+      // 원자적 increment: cap/일일 광고 한도를 동시에 만족할 때만 지급한다.
       const updateResult = await tx.user.updateMany({
-        where: { id: userId, [field]: { lt: cap } },
-        data: { [field]: { increment: grant.rewardAmount } },
+        where: {
+          id: userId,
+          [field]: { lt: cap },
+          adWatchesToday: { lt: CREDITS_CONFIG.ad.dailyLimit },
+        },
+        data: {
+          [field]: { increment: grant.rewardAmount },
+          adWatchesToday: { increment: 1 },
+        },
       });
-      let capReached = false;
       if (updateResult.count === 0) {
-        // count===0 의 원인을 검증: user 부재(cascade 삭제) 인지 진짜 cap 도달인지 구분
+        // count===0 의 원인을 검증: user 부재, cap 도달, 일일 한도 도달을 구분한다.
         const current = await tx.user.findUnique({
           where: { id: userId },
-          select: { aiCredits: true, csvImportCredits: true },
+          select: { aiCredits: true, csvImportCredits: true, adWatchesToday: true },
         });
         if (!current) throw new Error('user_not_found');
         const balance = field === 'aiCredits' ? current.aiCredits : current.csvImportCredits;
+        await tx.adRewardGrant.update({
+          where: { id: grant.id },
+          data: { status: 'REJECTED' },
+        });
         if (balance >= cap) {
-          capReached = true;
-        } else {
-          throw new Error('redeem_state_inconsistent');
+          return { success: false as const, reason: 'cap_reached' };
         }
+        if (current.adWatchesToday >= CREDITS_CONFIG.ad.dailyLimit) {
+          return { success: false as const, reason: 'daily_ad_limit' };
+        }
+        return { success: false as const, reason: 'redeem_state_inconsistent' };
       }
-
-      // nonce 상태 마킹 — capReached 면 REJECTED, 아니면 REDEEMED.
-      // 트랜잭션 정상 commit 으로 마킹 보장 (이전엔 throw 가 update 까지 롤백시켜 nonce 재사용 가능)
-      await tx.adRewardGrant.update({
-        where: { id: grant.id },
-        data: capReached
-          ? { status: 'REJECTED' }
-          : { status: 'REDEEMED', redeemedAt: new Date() },
-      });
-
-      // 광고 시청 카운터는 cap 여부와 무관하게 증가 (시청은 발생함)
-      await tx.user.update({
-        where: { id: userId },
-        data: { adWatchesToday: { increment: 1 } },
-      });
 
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { aiCredits: true, csvImportCredits: true, adWatchesToday: true },
       });
 
-      return { grant, user: user!, capReached };
+      return { success: true as const, grant, user: user! };
     });
 
-    if (result.capReached) {
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        nonce_not_found: 404,
+        nonce_user_mismatch: 403,
+        nonce_already_used: 409,
+        nonce_expired: 410,
+        invalid_ad_group_id: 400,
+        cap_reached: 409,
+        daily_ad_limit: 429,
+      };
       return withCors(
         req,
-        NextResponse.json({ success: false, reason: 'cap_reached' }, { status: 409 }),
+        NextResponse.json(
+          { success: false, reason: result.reason },
+          { status: statusMap[result.reason] ?? 500 },
+        ),
       );
     }
 
@@ -117,6 +151,9 @@ export async function POST(req: NextRequest) {
       nonce_user_mismatch: 403,
       nonce_already_used: 409,
       nonce_expired: 410,
+      invalid_ad_group_id: 400,
+      cap_reached: 409,
+      daily_ad_limit: 429,
     };
     return withCors(
       req,

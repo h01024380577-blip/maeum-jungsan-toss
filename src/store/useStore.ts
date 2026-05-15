@@ -86,6 +86,21 @@ interface AppState {
   resetAnalysis: () => void;
 }
 
+const createInitialCredits = (): CreditsState => ({
+  ai: { balance: 0, cap: 5, canWatchAd: false },
+  csv: { balance: 0, cap: 3, canWatchAd: false },
+  ad: { watchesRemaining: 0, dailyLimit: 10, resetAt: null },
+  loaded: false,
+});
+
+const createInitialAnalysisResult = (): AppState['analysisResult'] => ({
+  data: null,
+  initialData: null,
+  showBottomSheet: false,
+  isParsing: false,
+  selectedImage: null,
+});
+
 
 export const useStore = create<AppState>()((set, get) => ({
   entries: [],
@@ -95,19 +110,8 @@ export const useStore = create<AppState>()((set, get) => ({
   tossUserId: null,
   tossUserName: null,
   notificationsEnabled: false,
-  credits: {
-    ai: { balance: 0, cap: 5, canWatchAd: false },
-    csv: { balance: 0, cap: 3, canWatchAd: false },
-    ad: { watchesRemaining: 0, dailyLimit: 10, resetAt: null },
-    loaded: false,
-  },
-  analysisResult: {
-    data: null,
-    initialData: null,
-    showBottomSheet: false,
-    isParsing: false,
-    selectedImage: null,
-  },
+  credits: createInitialCredits(),
+  analysisResult: createInitialAnalysisResult(),
 
   refreshCredits: async () => {
     try {
@@ -293,7 +297,17 @@ export const useStore = create<AppState>()((set, get) => ({
 
   clearData: () => {
     clearAuthToken();
-    set({ entries: [], contacts: [], feedback: [], tossUserId: null, tossUserName: null, notificationsEnabled: false, isLoaded: true });
+    set({
+      entries: [],
+      contacts: [],
+      feedback: [],
+      tossUserId: null,
+      tossUserName: null,
+      notificationsEnabled: false,
+      credits: createInitialCredits(),
+      analysisResult: createInitialAnalysisResult(),
+      isLoaded: true,
+    });
   },
 
   setNotificationsEnabled: (enabled: boolean) =>
@@ -306,13 +320,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   resetAnalysis: () =>
     set(() => ({
-      analysisResult: {
-        data: null,
-        initialData: null,
-        showBottomSheet: false,
-        isParsing: false,
-        selectedImage: null,
-      },
+      analysisResult: createInitialAnalysisResult(),
     })),
 }));
 

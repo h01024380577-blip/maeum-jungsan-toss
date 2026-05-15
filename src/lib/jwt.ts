@@ -12,8 +12,14 @@ function base64url(data: string | Buffer): string {
   return Buffer.from(data).toString('base64url');
 }
 
+export interface JwtPayload {
+  userId: string;
+  userKey: string;
+  sessionVersion: number;
+}
+
 /** JWT 발급 (HS256, 14일 만료) */
-export function signJwt(payload: { userId: string; userKey: string }): string {
+export function signJwt(payload: JwtPayload): string {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = base64url(JSON.stringify({
     ...payload,
@@ -28,7 +34,7 @@ export function signJwt(payload: { userId: string; userKey: string }): string {
 }
 
 /** JWT 검증 — 유효하면 payload, 아니면 null */
-export function verifyJwt(token: string): { userId: string; userKey: string } | null {
+export function verifyJwt(token: string): JwtPayload | null {
   try {
     const [header, body, signature] = token.split('.');
     if (!header || !body || !signature) return null;
@@ -44,7 +50,11 @@ export function verifyJwt(token: string): { userId: string; userKey: string } | 
     if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return { userId: payload.userId, userKey: payload.userKey };
+    const sessionVersion = payload.sessionVersion === undefined ? 0 : payload.sessionVersion;
+    if (typeof payload.userId !== 'string' || !payload.userId.trim()) return null;
+    if (typeof payload.userKey !== 'string' || !payload.userKey.trim()) return null;
+    if (!Number.isSafeInteger(sessionVersion) || sessionVersion < 0) return null;
+    return { userId: payload.userId, userKey: payload.userKey, sessionVersion };
   } catch {
     return null;
   }

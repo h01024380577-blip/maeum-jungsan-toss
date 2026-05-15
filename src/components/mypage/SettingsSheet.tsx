@@ -77,7 +77,12 @@ export default function SettingsSheet({ open, onClose }: Props) {
     }
   };
 
-  const handleLogoutConfirm = () => {
+  const handleLogoutConfirm = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // 서버 세션 정리가 실패해도 이 기기의 로컬 상태는 반드시 비운다.
+    }
     clearData();
     try {
       localStorage.removeItem('heartbook-onboarding-seen');

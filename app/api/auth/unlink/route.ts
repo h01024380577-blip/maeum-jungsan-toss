@@ -51,7 +51,12 @@ async function handleUnlink(req: NextRequest): Promise<NextResponse> {
   try {
     await prisma.user.updateMany({
       where: { tossUserKey: String(userKey) },
-      data: { accessToken: null, refreshToken: null, tokenExpiresAt: null },
+      data: {
+        accessToken: null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        sessionVersion: { increment: 1 },
+      },
     });
   } catch {
     // DB 오류여도 200 반환 (토스 서버 재시도 방지)

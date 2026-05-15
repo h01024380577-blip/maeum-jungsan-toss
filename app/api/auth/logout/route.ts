@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { fetchWithRetry, TOSS_API_BASE } from '@/src/lib/tossApiClient';
-import { verifyJwt } from '@/src/lib/jwt';
 import { corsResponse, withCors } from '@/src/lib/cors';
+import { AUTH_COOKIE_NAME, getAuthenticatedSessionFromRequest } from '@/src/lib/apiAuth';
 
 export async function POST(req: NextRequest) {
-  let userId = req.cookies.get('toss_user_id')?.value;
-  let userKey = req.cookies.get('toss_user_key')?.value;
-
-  // Bearer 토큰에서도 userId/userKey 추출 (CSR 모드)
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const jwt = verifyJwt(authHeader.slice(7));
-    if (jwt) {
-      userId = jwt.userId;
-      userKey = jwt.userKey;
-    }
-  }
+  const session = await getAuthenticatedSessionFromRequest(req);
+  const userId = session?.userId;
+  const userKey = session?.userKey;
 
   // 토스 연결 끊기 (remove-by-user-key)
   if (userKey) {
@@ -40,12 +31,18 @@ export async function POST(req: NextRequest) {
     try {
       await prisma.user.update({
         where: { id: userId },
-        data: { accessToken: null, refreshToken: null, tokenExpiresAt: null },
+        data: {
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          sessionVersion: { increment: 1 },
+        },
       });
     } catch {}
   }
 
   const res = NextResponse.json({ ok: true });
+  res.cookies.delete(AUTH_COOKIE_NAME);
   res.cookies.delete('toss_user_id');
   res.cookies.delete('toss_user_key');
   return withCors(req, res);
