@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import EntryEditSheet from './EntryEditSheet';
 import { formatAmountMan, formatSignedAmountMan } from '../utils/amountFormat';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 const RELATION_PRESETS = ['가족', '친척', '친구', '동료', '지인', '기타'] as const;
 
@@ -29,6 +30,21 @@ export default function ContactDetail({ contactId, onBack }: { contactId: string
   const [savingRelation, setSavingRelation] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
   const contact = contacts.find(c => c.id === contactId);
+
+  useBackHandler(!!contact, () => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+      return true;
+    }
+
+    if (showRelationEdit) {
+      if (!savingRelation) setShowRelationEdit(false);
+      return true;
+    }
+
+    onBack();
+    return true;
+  });
 
   if (!contact) return null;
 

@@ -4,6 +4,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon, Monitor, X as CloseIcon } from 'lucide-react';
 import { useTheme, ThemeMode } from '@/src/lib/theme';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 interface Props {
   open: boolean;
@@ -12,6 +13,11 @@ interface Props {
 
 export default function ThemePickerSheet({ open, onClose }: Props) {
   const { mode, resolved, setMode } = useTheme();
+
+  useBackHandler(open, () => {
+    onClose();
+    return true;
+  });
 
   const options = [
     { key: 'light' as ThemeMode, label: '라이트', Icon: Sun },

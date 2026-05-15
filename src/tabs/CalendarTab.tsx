@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { useStore } from '../store/useStore';
+import { useStore, type EventEntry } from '../store/useStore';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportEventToCalendar, exportAllEventsToCalendar } from '../lib/exportToCalendar';
 import { isSamsungGalaxyDevice, hasSeenSamsungCalendarHint, markSamsungCalendarHintSeen } from '../lib/platformDetect';
 import SamsungCalendarHintDialog from '../components/SamsungCalendarHintDialog';
+import EntryEditSheet from '../components/EntryEditSheet';
 import { formatAmountMan } from '../utils/amountFormat';
 
 const eventIcon = (t: string, size = 12) => {
@@ -22,6 +23,7 @@ export default function CalendarTab() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
 
   // Samsung Galaxy 안내 모달 — 첫 캘린더 export 시도 시 1회 노출
   const [samsungHintOpen, setSamsungHintOpen] = useState(false);
@@ -115,6 +117,13 @@ export default function CalendarTab() {
     try { return e.date && isSameDay(parseISO(e.date), date); } catch { return false; }
   });
 
+  const handleEventKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, entry: EventEntry) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+
+    event.preventDefault();
+    setSelectedEntry(entry);
+  };
+
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view !== 'month') return null;
     const dayEvents = getDateEntries(date);
@@ -173,7 +182,14 @@ export default function CalendarTab() {
           </h3>
           {selectedDayEvents.length > 0 ? (
             selectedDayEvents.map(e => (
-              <div key={e.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+              <div
+                key={e.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedEntry(e)}
+                onKeyDown={(event) => handleEventKeyDown(event, e)}
+                className="flex cursor-pointer items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all active:scale-[0.98] active:bg-gray-50"
+              >
                 <div className="flex min-w-0 items-center space-x-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${e.type === 'INCOME' ? 'bg-blue-50' : 'bg-red-50'}`}>
                     {eventIcon(e.eventType, 16)}
@@ -199,7 +215,11 @@ export default function CalendarTab() {
                   <p className="text-[10px] text-gray-400 font-medium">{e.relation}</p>
                   <button
                     type="button"
-                    onClick={() => handleExportOne(e.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleExportOne(e.id);
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
                     disabled={exportingId === e.id || exportingAll}
                     className="mt-1 inline-flex items-center gap-0.5 rounded-md bg-gray-50 px-1.5 py-0.5 text-[9px] font-medium text-gray-500 active:bg-gray-100 disabled:opacity-50"
                     aria-label={`${e.targetName} 일정을 캘린더로 내보내기`}
@@ -217,6 +237,8 @@ export default function CalendarTab() {
           )}
         </div>
       </div>
+
+      <EntryEditSheet entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </div>
   );
 }

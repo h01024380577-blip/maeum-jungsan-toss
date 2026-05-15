@@ -7,6 +7,7 @@ import { X as CloseIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/src/lib/apiClient';
 import { useStore } from '@/src/store/useStore';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 interface Props {
   open: boolean;
@@ -17,6 +18,11 @@ export default function FeedbackSheet({ open, onClose }: Props) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const tossUserId = useStore((s) => s.tossUserId);
+
+  useBackHandler(open, () => {
+    if (!sending) onClose();
+    return true;
+  });
 
   const handleSend = async () => {
     if (!text.trim()) {

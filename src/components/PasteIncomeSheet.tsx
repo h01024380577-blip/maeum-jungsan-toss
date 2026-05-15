@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { apiFetch } from '@/src/lib/apiClient';
 import { useStore, type Contact, type EventType, type TransactionSource } from '@/src/store/useStore';
 import { formatManInputValue, parseManInputToWon } from '@/src/utils/amountFormat';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
   { value: 'wedding', label: '결혼', Icon: Heart },
@@ -107,6 +108,11 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
     reset();
     onClose();
   };
+
+  useBackHandler(isOpen, () => {
+    handleClose();
+    return true;
+  });
 
   const handlePaste = async () => {
     setError(null);

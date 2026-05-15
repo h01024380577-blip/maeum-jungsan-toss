@@ -5,6 +5,8 @@ import { Home, Calendar as CalendarIcon, ClipboardPaste, User, BookUser } from '
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ConfirmDialog } from '@toss/tds-mobile';
+import { consumeBackHandler } from '@/src/lib/backHandlers';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 type Tab = 'home' | 'calendar' | 'history' | 'stats' | 'contacts';
 
@@ -24,12 +26,22 @@ export default function Layout({ children, activeTab }: { children: React.ReactN
   const router = useRouter();
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  useBackHandler(showExitConfirm, () => {
+    setShowExitConfirm(false);
+    return true;
+  });
+
   // 뒤로가기: 다른 탭 → 홈, 홈 → 종료 확인
   useEffect(() => {
     // 항상 pushState를 유지해서 popstate를 잡을 수 있게
     window.history.pushState(null, '', window.location.href);
 
     const handlePopState = () => {
+      if (consumeBackHandler()) {
+        window.history.pushState(null, '', window.location.href);
+        return;
+      }
+
       if (activeTab === 'home') {
         // 홈에서 뒤로가기 → 종료 확인
         window.history.pushState(null, '', window.location.href);

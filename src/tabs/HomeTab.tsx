@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import EntryEditSheet from '../components/EntryEditSheet';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 
@@ -198,6 +199,30 @@ export default function HomeTab() {
   const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
   const [monthEntryFilter, setMonthEntryFilter] = useState<MonthEntryFilter | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useBackHandler(showBottomSheet || showTransferModal || adPromptOpen, () => {
+    if (adPromptOpen) {
+      setAdPromptOpen(false);
+      return true;
+    }
+
+    if (showTransferModal) {
+      setShowTransferModal(false);
+      return true;
+    }
+
+    if (showBottomSheet) {
+      setShowBottomSheet(false);
+      return true;
+    }
+
+    return false;
+  });
+
+  useBackHandler(!!monthEntryFilter, () => {
+    setMonthEntryFilter(null);
+    return true;
+  });
 
   const now = new Date();
   const monthEntries = entries.filter((entry) => {

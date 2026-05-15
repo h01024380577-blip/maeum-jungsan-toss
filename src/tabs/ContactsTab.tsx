@@ -3,6 +3,7 @@ import { Search, UserPlus, ArrowRight, User, CheckCircle, AlertCircle, Star, Che
 import { useStore, type Contact } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContactDetail from '../components/ContactDetail';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { formatSignedAmountMan } from '../utils/amountFormat';
 
 type FetchedContact = { name: string; phone: string; relation: string };
@@ -216,6 +217,27 @@ export default function ContactsTab() {
       setSelectionSearch('');
     }
   };
+
+  useBackHandler(showConfirm || showSelection || !!syncResult || (!!isSyncing && !!syncPhase), () => {
+    if (showSelection) {
+      closeSelection();
+      return true;
+    }
+
+    if (syncResult) {
+      setSyncResult(null);
+      return true;
+    }
+
+    if (showConfirm) {
+      setShowConfirm(false);
+      return true;
+    }
+
+    if (isSyncing && syncPhase) return true;
+
+    return false;
+  });
 
   if (selectedContactId) {
     return (

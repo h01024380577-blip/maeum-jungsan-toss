@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/apiClient';
 import AdPromptDialog from './ads/AdPromptDialog';
 import { toast } from 'sonner';
 import { formatAmountMan } from '../utils/amountFormat';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 interface BackupRow {
   targetName: string;
@@ -259,6 +260,19 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setImportMode('general');
     setBackupRows(null);
   };
+
+  useBackHandler(isOpen, () => {
+    if (adPromptOpen) {
+      setAdPromptOpen(false);
+      return true;
+    }
+
+    if (isImporting) return true;
+
+    onClose();
+    reset();
+    return true;
+  });
 
   const allRows = importMode === 'backup' ? (backupRows ?? []) : processRows();
   const previewRows = allRows.slice(0, 3);

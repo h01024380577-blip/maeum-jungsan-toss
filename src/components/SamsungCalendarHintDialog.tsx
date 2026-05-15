@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar, X } from 'lucide-react';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 interface Props {
   isOpen: boolean;
@@ -8,6 +9,11 @@ interface Props {
 }
 
 export default function SamsungCalendarHintDialog({ isOpen, onConfirm, onDismiss }: Props) {
+  useBackHandler(isOpen, () => {
+    onDismiss();
+    return true;
+  });
+
   return (
     <AnimatePresence>
       {isOpen && (

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 type EntryEditSheetProps = {
   entry: EventEntry | null;
@@ -21,6 +22,16 @@ export default function EntryEditSheet({ entry, onClose }: EntryEditSheetProps) 
     setIsDeleting(false);
     setIsSaving(false);
   }, [entry]);
+
+  useBackHandler(!!entry, () => {
+    if (deleteTarget) {
+      if (!isDeleting) setDeleteTarget(null);
+      return true;
+    }
+
+    if (!isSaving) onClose();
+    return true;
+  });
 
   if (!entry || !draft) return null;
 

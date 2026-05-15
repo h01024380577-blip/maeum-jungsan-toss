@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import BulkImportModal from '../components/BulkImportModal';
 import ContactDetail from '../components/ContactDetail';
 import EntryEditSheet from '../components/EntryEditSheet';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { exportToCsv } from '../utils/csvExport';
 import { formatAmountMan } from '../utils/amountFormat';
 
@@ -138,6 +139,25 @@ export default function HistoryTab() {
       setIsDeleting(false);
     }
   };
+
+  useBackHandler(!!deleteTarget || bulkDeleteOpen || selectionMode, () => {
+    if (deleteTarget) {
+      if (!isDeleting) setDeleteTarget(null);
+      return true;
+    }
+
+    if (bulkDeleteOpen) {
+      if (!isDeleting) setBulkDeleteOpen(false);
+      return true;
+    }
+
+    if (selectionMode) {
+      clearSelection();
+      return true;
+    }
+
+    return false;
+  });
 
   return (
     <div className="pb-4">

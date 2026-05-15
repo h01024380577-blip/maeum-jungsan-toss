@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useStore } from '@/src/store/useStore';
 import { useTheme } from '@/src/lib/theme';
 import { apiFetch } from '@/src/lib/apiClient';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 import SettingsRow from './SettingsRow';
 import ThemePickerSheet from './ThemePickerSheet';
@@ -91,6 +92,31 @@ export default function SettingsSheet({ open, onClose }: Props) {
     onClose();
     router.replace('/');
   };
+
+  useBackHandler(open, () => {
+    if (logoutOpen) {
+      setLogoutOpen(false);
+      return true;
+    }
+
+    if (feedbackOpen) {
+      setFeedbackOpen(false);
+      return true;
+    }
+
+    if (faqOpen) {
+      setFaqOpen(false);
+      return true;
+    }
+
+    if (themeOpen) {
+      setThemeOpen(false);
+      return true;
+    }
+
+    onClose();
+    return true;
+  });
 
   return (
     <AnimatePresence>

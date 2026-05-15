@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, X as CloseIcon } from 'lucide-react';
+import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 interface Props {
   open: boolean;
@@ -31,6 +32,11 @@ const FAQS = [
 
 export default function FaqSheet({ open, onClose }: Props) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  useBackHandler(open, () => {
+    onClose();
+    return true;
+  });
 
   return (
     <AnimatePresence>
