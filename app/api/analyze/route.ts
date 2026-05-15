@@ -13,6 +13,7 @@ import {
   hasMeaningfulData,
   LOW_CONFIDENCE_RESPONSE,
 } from '@/src/lib/geminiHelpers';
+import { getRequestOrigin } from '@/src/lib/requestOrigin';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -87,7 +88,10 @@ export async function POST(req: NextRequest) {
       responseText = r.text ?? '{}';
 
     } else if (type === 'url') {
-      const base = process.env.APP_URL ?? 'http://localhost:3000';
+      const base = getRequestOrigin({
+        headers: req.headers,
+        nextUrlOrigin: req.nextUrl.origin,
+      });
       // 원본 요청의 인증 컨텍스트(JWT/쿠키/x-user-id)를 parse-url로 전달해야
       // 크레딧 가드가 정상 동작한다. 헤더 누락 시 parse-url이 401로 튕겨
       // 차감도 환불도 일어나지 않음.

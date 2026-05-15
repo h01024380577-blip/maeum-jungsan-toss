@@ -1,6 +1,5 @@
 import https from 'https';
 import fs from 'fs';
-import path from 'path';
 
 const TOSS_MESSENGER_BASE = 'https://apps-in-toss-api.toss.im';
 
@@ -12,13 +11,11 @@ export async function tossMessengerFetch(
   endpoint: string,
   options: { method: string; headers: Record<string, string>; body?: string }
 ): Promise<any> {
-  const certPath = process.env.TOSS_MTLS_CERT_PATH ||
-    path.join(process.cwd(), 'maeum-jungsan_public.crt');
-  const keyPath = process.env.TOSS_MTLS_KEY_PATH ||
-    path.join(process.cwd(), 'maeum-jungsan_private.key');
+  const certPath = process.env.TOSS_MTLS_CERT_PATH?.trim();
+  const keyPath = process.env.TOSS_MTLS_KEY_PATH?.trim();
 
   // 인증서 없으면 plain fetch 폴백 (샌드박스 환경)
-  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+  if (!certPath || !keyPath || !fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
     const res = await fetch(`${TOSS_MESSENGER_BASE}${endpoint}`, {
       method: options.method,
       headers: options.headers,

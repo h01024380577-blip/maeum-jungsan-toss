@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
+import { ThemeProvider as TdsThemeProvider } from "@toss/tds-mobile";
 import { useStore } from "@/src/store/useStore";
 import Onboarding from "@/src/components/Onboarding";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
 
-const SKIP_ONBOARDING_PATHS = ['/terms', '/intro', '/ui-prototype'];
+const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
 
 function InnerProviders({ children }: { children: React.ReactNode }) {
   const { loadFromSupabase, isLoaded, tossUserId } = useStore();
@@ -90,7 +91,9 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <InnerProviders>{children}</InnerProviders>
+      <TdsThemeProvider>
+        <InnerProviders>{children}</InnerProviders>
+      </TdsThemeProvider>
     </ThemeProvider>
   );
 }

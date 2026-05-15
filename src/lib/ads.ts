@@ -6,16 +6,16 @@
 
 import type { RewardType } from '@prisma/client';
 
-/** 환경변수에서 광고 그룹 ID 로드. 테스트 ID fallback. */
-const AD_GROUP_IDS = {
-  AI_CREDIT:
-    process.env.NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT || 'ait-ad-test-rewarded-id',
-  CSV_CREDIT:
-    process.env.NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT || 'ait-ad-test-rewarded-id',
-} as const;
+const TEST_REWARDED_AD_GROUP_ID = 'ait-ad-test-rewarded-id';
 
 export function getAdGroupId(rewardType: RewardType): string {
-  return AD_GROUP_IDS[rewardType];
+  const configured =
+    rewardType === 'AI_CREDIT'
+      ? process.env.NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT
+      : process.env.NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT;
+
+  if (configured?.trim()) return configured.trim();
+  return process.env.NODE_ENV === 'production' ? '' : TEST_REWARDED_AD_GROUP_ID;
 }
 
 /** 현재 환경에서 리워드 광고 사용 가능 여부. SSR/미지원 버전이면 false. */

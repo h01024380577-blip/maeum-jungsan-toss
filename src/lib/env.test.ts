@@ -110,6 +110,7 @@ describe('listMissingOptional', () => {
       TOSS_MSG_TEMPLATE_CODE: 'tpl',
       NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT: 'g1',
       NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT: 'g2',
+      NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER: 'g3',
       NEXT_PUBLIC_API_URL: 'https://x',
     };
     expect(listMissingOptional(env)).toEqual([]);
@@ -120,11 +121,16 @@ describe('listMissingOptional', () => {
       TOSS_MSG_TEMPLATE_CODE: 'tpl',
       NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT: '',
       // NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT undefined
+      // NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER undefined
       NEXT_PUBLIC_API_URL: 'https://x',
     };
     const missing = listMissingOptional(env);
     expect(missing).toEqual(
-      expect.arrayContaining(['NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT', 'NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT']),
+      expect.arrayContaining([
+        'NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT',
+        'NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT',
+        'NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER',
+      ]),
     );
     expect(missing).not.toContain('TOSS_MSG_TEMPLATE_CODE');
   });

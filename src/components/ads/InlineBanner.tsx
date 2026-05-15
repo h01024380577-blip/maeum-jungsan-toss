@@ -34,7 +34,7 @@ export default function InlineBanner({
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    if (!isInitialized || !ref.current) return;
+    if (!adGroupId || !isInitialized || !ref.current) return;
     let handle: TossBannerHandle | null = null;
     let disposed = false;
 
@@ -66,7 +66,7 @@ export default function InlineBanner({
   }, [isInitialized, adGroupId, variant, tone, theme, attachBanner]);
 
   // 미지원 환경 or 광고 채울 것 없음 → 공간 차지하지 않음
-  if (unsupported || hidden) return null;
+  if (!adGroupId || unsupported || hidden) return null;
 
   return (
     <div className={className}>

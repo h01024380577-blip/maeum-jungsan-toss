@@ -7,24 +7,41 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ];
 
+const BASE_CORS_HEADERS = {
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+  'Access-Control-Max-Age': '86400',
+  Vary: 'Origin',
+} as const;
+
+export function isAllowedCorsOrigin(origin: string | null): boolean {
+  return origin === null || ALLOWED_ORIGINS.includes(origin);
+}
+
 export function getCorsHeaders(origin: string | null): Record<string, string> {
-  // AIT WebView에서는 origin이 null이거나 ALLOWED_ORIGINS에 없는 내부 스킴일 수 있음
-  // origin이 없거나 허용 목록에 없으면 '*'로 허용 (credentials 미사용 시)
-  const isAllowed = origin && ALLOWED_ORIGINS.includes(origin);
+  if (!origin) return { ...BASE_CORS_HEADERS };
+  if (!ALLOWED_ORIGINS.includes(origin)) return { ...BASE_CORS_HEADERS };
+
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
-    ...(isAllowed ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
-    'Access-Control-Max-Age': '86400',
+    ...BASE_CORS_HEADERS,
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Credentials': 'true',
   };
 }
 
 /** OPTIONS preflight 응답 */
 export function corsResponse(req: NextRequest): NextResponse {
+  const origin = req.headers.get('origin');
+  if (!isAllowedCorsOrigin(origin)) {
+    return NextResponse.json(
+      { error: 'CORS origin denied' },
+      { status: 403, headers: { Vary: 'Origin' } },
+    );
+  }
+
   return new NextResponse(null, {
     status: 204,
-    headers: getCorsHeaders(req.headers.get('origin')),
+    headers: getCorsHeaders(origin),
   });
 }
 

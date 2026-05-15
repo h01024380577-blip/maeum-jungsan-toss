@@ -12,7 +12,7 @@ import SettingsSheet from '@/src/components/mypage/SettingsSheet';
 import InlineBanner from '@/src/components/ads/InlineBanner';
 
 const STATS_BANNER_AD_GROUP_ID =
-  process.env.NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER || 'ait.v2.live.b224cbf2d96249cc';
+  process.env.NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER?.trim() ?? '';
 
 export default function MyPageTab() {
   const tossUserId = useStore((s) => s.tossUserId);
@@ -66,10 +66,12 @@ export default function MyPageTab() {
         </section>
 
         {/* 배너 광고 — 기존 통계 탭 하단 위치 승계 */}
-        <InlineBanner
-          adGroupId={STATS_BANNER_AD_GROUP_ID}
-          className="mt-2"
-        />
+        {STATS_BANNER_AD_GROUP_ID && (
+          <InlineBanner
+            adGroupId={STATS_BANNER_AD_GROUP_ID}
+            className="mt-2"
+          />
+        )}
       </div>
 
       <SettingsSheet

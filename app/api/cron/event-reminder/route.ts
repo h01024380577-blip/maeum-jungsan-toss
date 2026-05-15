@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { tossMessengerFetch } from '@/src/lib/tossMessengerFetch';
+import { cronUnauthorizedResponse, isCronRequestAuthorized } from '@/src/lib/cronAuth';
 
 const eventTypeLabel = (type: string, custom?: string | null) => {
   if (type === 'WEDDING') return '결혼';
@@ -10,10 +10,8 @@ const eventTypeLabel = (type: string, custom?: string | null) => {
 };
 
 export async function GET(req: NextRequest) {
-  // Vercel Cron 인증
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!isCronRequestAuthorized(req)) {
+    return cronUnauthorizedResponse();
   }
 
   const templateCode = process.env.TOSS_MSG_TEMPLATE_CODE;
@@ -50,6 +48,7 @@ export async function GET(req: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+  const { tossMessengerFetch } = await import('@/src/lib/tossMessengerFetch');
 
   for (const event of events) {
     const userKey = event.user.tossUserKey;

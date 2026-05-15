@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
@@ -426,7 +427,7 @@ export default function HomeTab() {
       <div className="px-5 pt-8 pb-3 max-[360px]:px-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <img
+            <Image
               src="/icon.png"
               alt="마음정산"
               width={40}
@@ -463,7 +464,13 @@ export default function HomeTab() {
           {selectedImage ? (
             <div className="flex min-h-[64px] items-center gap-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse">
-                <img src="/ai-loading-icon.png" alt="AI 분석 중" className="h-full w-full object-cover" />
+                <Image
+                  src="/ai-loading-icon.png"
+                  alt="AI 분석 중"
+                  width={40}
+                  height={40}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div>
                 <p className="text-[13px] font-black text-blue-600">이미지 분석 중...</p>

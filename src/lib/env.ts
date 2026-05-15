@@ -7,7 +7,7 @@
  *
  * 사용처:
  * - `instrumentation.ts:register()` 시작 시 fail-fast
- * - `/api/health` 응답 body 의 `checks.env`
+ * - `/api/health` 내부 인증 응답 body 의 `checks.env`
  */
 import { z } from 'zod';
 
@@ -74,12 +74,13 @@ export function formatValidationFailure(result: Extract<EnvValidationResult, { o
 
 /**
  * Optional 변수 — 부재 시 일부 기능만 비활성. throw 하지 않음.
- * 검증 결과를 log/health 응답으로 노출.
+ * 검증 결과를 log/내부 health 응답으로 노출.
  */
 const OPTIONAL_ENV_KEYS = [
   'TOSS_MSG_TEMPLATE_CODE',
   'NEXT_PUBLIC_AD_GROUP_ID_AI_CREDIT',
   'NEXT_PUBLIC_AD_GROUP_ID_CSV_CREDIT',
+  'NEXT_PUBLIC_AD_GROUP_ID_STATS_BANNER',
   'NEXT_PUBLIC_API_URL',
 ] as const;
 

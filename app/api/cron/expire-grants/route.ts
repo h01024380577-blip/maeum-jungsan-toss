@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
+import { cronUnauthorizedResponse, isCronRequestAuthorized } from '@/src/lib/cronAuth';
 
 /**
  * AdRewardGrant 만료 크론
@@ -9,9 +10,8 @@ import { prisma } from '@/src/lib/prisma';
  * 인증: Authorization: Bearer ${CRON_SECRET}
  */
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!isCronRequestAuthorized(req)) {
+    return cronUnauthorizedResponse();
   }
 
   const now = new Date();

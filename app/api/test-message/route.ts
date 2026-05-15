@@ -10,6 +10,10 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (process.env.TEST_MESSAGE_API_ENABLED !== 'true') {
+    return withCors(req, NextResponse.json({ error: 'not_found' }, { status: 404 }));
+  }
+
   const session = await getAuthenticatedSessionFromRequest(req);
   if (!session) {
     return withCors(req, NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 }));

@@ -39,17 +39,22 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
   }, []);
 
   const slot = rewardType === 'AI_CREDIT' ? credits.ai : credits.csv;
+  const adGroupId = getAdGroupId(rewardType);
   // 활성 조건은 "잔고가 cap 미만" + "환경 미지원이 확정되지 않음".
   // supported === null (로딩 중)은 낙관적으로 활성 — 클릭 시점에 다시 판정.
   // 오늘 광고 시청 상한(daily_ad_limit)도 클릭 시점에 서버에서 검사하므로
   // 여기서는 로컬 watchesRemaining만으로 선차단하지 않음.
   const capReached = slot.balance >= slot.cap;
-  const disabled = busy || supported === false || capReached;
+  const disabled = busy || supported === false || capReached || !adGroupId;
 
   const handleClick = async () => {
     if (busy) return;
     if (supported === false) {
       toast.message('이 버전에서는 광고가 지원되지 않아요. 토스 앱을 최신 버전으로 업데이트해 주세요.');
+      return;
+    }
+    if (!adGroupId) {
+      toast.error('광고 설정이 아직 완료되지 않았어요.');
       return;
     }
     if (supported === null) {
@@ -73,7 +78,7 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
         method: 'POST',
         body: JSON.stringify({
           rewardType,
-          adGroupId: getAdGroupId(rewardType),
+          adGroupId,
         }),
       });
       if (!nonceRes.ok) {
@@ -91,7 +96,7 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
       const { nonce } = await nonceRes.json();
 
       // 2) 광고 load+show
-      const outcome = await showRewardedAd(getAdGroupId(rewardType));
+      const outcome = await showRewardedAd(adGroupId);
       if (!outcome.earnedReward) {
         toast.message('광고를 끝까지 시청해야 보상을 받을 수 있어요.');
         return;
