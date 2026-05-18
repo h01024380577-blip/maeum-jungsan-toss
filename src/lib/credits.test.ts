@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { kstStartOfToday, looksLikeTossUserKey, normalizeGuestDeviceId } from './credits';
+import {
+  CREDITS_CONFIG,
+  kstStartOfToday,
+  looksLikeTossUserKey,
+  normalizeGuestDeviceId,
+} from './credits';
+
+describe('credits config', () => {
+  it('starts new users with 3 AI credits so reward ads are immediately available below cap', () => {
+    expect(CREDITS_CONFIG.ai.welcome).toBe(3);
+    expect(CREDITS_CONFIG.ai.welcome).toBeLessThan(CREDITS_CONFIG.ai.cap);
+  });
+});
 
 describe('kstStartOfToday', () => {
   it('KST 00:00 이후 시각은 같은 KST 날짜의 00:00을 반환한다', () => {

@@ -46,4 +46,44 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(css).toContain('.react-calendar__tile--active:enabled:focus');
     expect(css).toContain('.react-calendar__tile--active:enabled:hover');
   });
+
+  it('mentions both wedding and obituary URLs in the home URL placeholder', () => {
+    const home = read('src/tabs/HomeTab.tsx');
+
+    expect(home).toContain('청첩장 또는 부고장 URL을 붙여넣으세요');
+    expect(home).not.toContain('초대장 URL을 붙여넣으세요');
+  });
+
+  it('defaults the home input mode to URL', () => {
+    const home = read('src/tabs/HomeTab.tsx');
+
+    expect(home).toContain("useState<'text' | 'url'>('url')");
+    expect(home).not.toContain("useState<'text' | 'url'>('text')");
+  });
+
+  it('keeps the live banner ad group as a fallback when env is missing', () => {
+    const myPage = read('src/tabs/MyPageTab.tsx');
+
+    expect(myPage).toContain("|| 'ait.v2.live.b224cbf2d96249cc'");
+    expect(myPage).not.toContain("?? ''");
+  });
+
+  it('cleans server-only AIT build artifacts after the CSR build settles', () => {
+    const script = read('scripts/build-ait.sh');
+
+    expect(script).toContain('cleanup_server_artifacts');
+    expect(script).toMatch(/sleep\s+0\.[0-9]+/);
+    expect(script).toMatch(/cleanup_server_artifacts[\s\S]+sleep\s+0\.[0-9]+[\s\S]+cleanup_server_artifacts/);
+  });
+
+  it('sets the new-user AI credit default to 3 in schema and deployment migration', () => {
+    const schema = read('prisma/schema.prisma');
+    const migration = read('prisma/manual-migrations/2026-05-18_set_ai_credit_default_3.sql');
+    const deploy = read('scripts/deploy.sh');
+
+    expect(schema).toContain('aiCredits        Int      @default(3)');
+    expect(schema).not.toContain('웰컴 5회');
+    expect(migration).toContain('ALTER COLUMN "aiCredits" SET DEFAULT 3');
+    expect(deploy).toContain('2026-05-18_set_ai_credit_default_3.sql');
+  });
 });

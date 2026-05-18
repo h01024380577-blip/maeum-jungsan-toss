@@ -188,7 +188,7 @@ export default function HomeTab() {
   const { entries, addEntry, addFeedback, contacts, loadFromSupabase, tossUserId, tossUserName, refreshCredits } = useStore();
   const [inputText, setInputText] = useState('');
   const [inputUrl, setInputUrl] = useState('');
-  const [inputMode, setInputMode] = useState<'text' | 'url'>('text');
+  const [inputMode, setInputMode] = useState<'text' | 'url'>('url');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [adPromptOpen, setAdPromptOpen] = useState(false);
@@ -510,7 +510,7 @@ export default function HomeTab() {
                 if (inputMode === 'url') setInputUrl(event.target.value);
                 else setInputText(event.target.value);
               }}
-              placeholder={inputMode === 'url' ? '초대장 URL을 붙여넣으세요...' : '이미지 또는 메시지를 입력하세요...'}
+              placeholder={inputMode === 'url' ? '청첩장 또는 부고장 URL을 붙여넣으세요...' : '이미지 또는 메시지를 입력하세요...'}
               className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 max-[360px]:h-[68px] max-[360px]:text-[13px]"
             />
           )}

@@ -32,7 +32,7 @@ CREATE TABLE "User" (
     "tokenExpiresAt" TIMESTAMP(3),
     "scopes" TEXT,
     "notificationsEnabled" BOOLEAN NOT NULL DEFAULT false,
-    "aiCredits" INTEGER NOT NULL DEFAULT 5,
+    "aiCredits" INTEGER NOT NULL DEFAULT 3,
     "csvImportCredits" INTEGER NOT NULL DEFAULT 1,
     "adWatchesToday" INTEGER NOT NULL DEFAULT 0,
     "adWatchesResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -164,4 +164,3 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_eventId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
