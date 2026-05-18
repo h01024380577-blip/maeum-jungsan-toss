@@ -39,4 +39,11 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(source).not.toMatch(/window\.location\.href\s*=\s*`mailto:/);
     expect(source).not.toMatch(/window\.location\.href\s*=\s*['"]supertoss:\/\//);
   });
+
+  it('keeps the selected calendar date visible while the tile has focus', () => {
+    const css = read('app/globals.css');
+
+    expect(css).toContain('.react-calendar__tile--active:enabled:focus');
+    expect(css).toContain('.react-calendar__tile--active:enabled:hover');
+  });
 });

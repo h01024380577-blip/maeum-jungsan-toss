@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { useStore, type EventEntry } from '../store/useStore';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportEventToCalendar, exportAllEventsToCalendar } from '../lib/exportToCalendar';
@@ -10,6 +10,11 @@ import { isSamsungGalaxyDevice, hasSeenSamsungCalendarHint, markSamsungCalendarH
 import SamsungCalendarHintDialog from '../components/SamsungCalendarHintDialog';
 import EntryEditSheet from '../components/EntryEditSheet';
 import { formatAmountMan } from '../utils/amountFormat';
+import {
+  getCalendarDisplayEntries,
+  getEntriesForCalendarDate,
+  shouldClearCalendarDateSelection,
+} from '../lib/calendarDisplay';
 
 const eventIcon = (t: string, size = 12) => {
   if (t === 'wedding') return <Heart size={size} className="text-pink-500 fill-pink-500" />;
@@ -20,7 +25,8 @@ const eventIcon = (t: string, size = 12) => {
 
 export default function CalendarTab() {
   const { entries } = useStore();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [activeStartDate, setActiveStartDate] = useState(() => startOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
@@ -113,10 +119,6 @@ export default function CalendarTab() {
     if (action) await action();
   };
 
-  const getDateEntries = (date: Date) => entries.filter(e => {
-    try { return e.date && isSameDay(parseISO(e.date), date); } catch { return false; }
-  });
-
   const handleEventKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, entry: EventEntry) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
 
@@ -126,7 +128,7 @@ export default function CalendarTab() {
 
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view !== 'month') return null;
-    const dayEvents = getDateEntries(date);
+    const dayEvents = getEntriesForCalendarDate(entries, date);
     if (dayEvents.length === 0) return null;
     return (
       <div className="flex justify-center space-x-0.5 mt-0.5">
@@ -137,7 +139,11 @@ export default function CalendarTab() {
     );
   };
 
-  const selectedDayEvents = getDateEntries(selectedDate);
+  const visibleEvents = getCalendarDisplayEntries(entries, { activeStartDate, selectedDate });
+  const listTitle = selectedDate
+    ? `${format(selectedDate, 'M월 d일')} 일정`
+    : `${format(activeStartDate, 'M월')} 전체 일정`;
+  const emptyMessage = selectedDate ? '일정이 없습니다' : '이번 달 일정이 없습니다';
 
   return (
     <div className="pb-4">
@@ -168,7 +174,19 @@ export default function CalendarTab() {
       <div className="px-5 pt-4 space-y-4">
         <div className="bg-white p-4 rounded-[24px] shadow-sm border border-gray-100">
           <Calendar
-            onChange={(v) => setSelectedDate(v as Date)}
+            activeStartDate={activeStartDate}
+            onActiveStartDateChange={({ activeStartDate: nextStartDate }) => {
+              if (!nextStartDate) return;
+              setActiveStartDate(nextStartDate);
+              if (shouldClearCalendarDateSelection(activeStartDate, nextStartDate)) {
+                setSelectedDate(null);
+              }
+            }}
+            onChange={(v) => {
+              if (!(v instanceof Date)) return;
+              setSelectedDate(v);
+              setActiveStartDate(startOfMonth(v));
+            }}
             value={selectedDate}
             tileContent={tileContent}
             formatDay={(locale, date) => format(date, 'd')}
@@ -178,10 +196,10 @@ export default function CalendarTab() {
 
         <div className="space-y-2.5">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">
-            {format(selectedDate, 'M월 d일')} 일정 ({selectedDayEvents.length})
+            {listTitle} ({visibleEvents.length})
           </h3>
-          {selectedDayEvents.length > 0 ? (
-            selectedDayEvents.map(e => (
+          {visibleEvents.length > 0 ? (
+            visibleEvents.map(e => (
               <div
                 key={e.id}
                 role="button"
@@ -232,7 +250,7 @@ export default function CalendarTab() {
             ))
           ) : (
             <div className="bg-white p-10 rounded-2xl border border-dashed border-gray-200 text-center">
-              <p className="text-sm text-gray-300 font-medium">일정이 없습니다</p>
+              <p className="text-sm text-gray-300 font-medium">{emptyMessage}</p>
             </div>
           )}
         </div>
