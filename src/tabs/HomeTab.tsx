@@ -12,6 +12,7 @@ import EntryEditSheet from '../components/EntryEditSheet';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
+import { openExternalUrl } from '../lib/openExternalUrl';
 
 
 
@@ -872,12 +873,7 @@ export default function HomeTab() {
                       setTimeout(async () => {
                         // 토스 앱 송금 화면으로 이동
                         try {
-                          if (isAppsInToss()) {
-                            const { openURL } = await import('@apps-in-toss/web-framework');
-                            await openURL('supertoss://send');
-                          } else {
-                            window.location.href = 'supertoss://send';
-                          }
+                          await openExternalUrl('supertoss://send');
                         } catch {
                           // 스킴 열기 실패 시 무시 (계좌번호는 이미 복사됨)
                         }

@@ -2,6 +2,10 @@
 # CSR 빌드용 — API 라우트를 임시 제외하고 정적 HTML 생성
 set -e
 
+# 이전 server build 가 남긴 route validator 가 app/api 를 참조하면,
+# CSR 빌드에서 API 라우트를 제외한 뒤 type check 가 실패한다.
+rm -rf dist/web dist/types dist/dev/types
+
 # API 라우트 임시 이동 (CSR 번들에 불필요)
 mv app/api app/_api_ait_backup
 

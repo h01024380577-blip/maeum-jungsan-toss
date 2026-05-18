@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { prisma } from '@/src/lib/prisma';
+import { deleteUserAccountDataByTossUserKey } from '@/src/lib/accountDeletion';
 
 function verifyBasicAuth(req: NextRequest): boolean {
   const secret = process.env.TOSS_CALLBACK_SECRET;
@@ -47,19 +47,13 @@ async function handleUnlink(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing userKey' }, { status: 400 });
   }
 
-  // userKey 기준으로 토큰/세션 폐기
+  // userKey 기준으로 서비스 회원 데이터 전체 삭제.
+  // 토스 연결 끊기/탈퇴 후에도 미니앱 데이터가 남지 않아야 한다.
   try {
-    await prisma.user.updateMany({
-      where: { tossUserKey: String(userKey) },
-      data: {
-        accessToken: null,
-        refreshToken: null,
-        tokenExpiresAt: null,
-        sessionVersion: { increment: 1 },
-      },
-    });
-  } catch {
-    // DB 오류여도 200 반환 (토스 서버 재시도 방지)
+    await deleteUserAccountDataByTossUserKey(String(userKey));
+  } catch (err) {
+    console.error('[auth/unlink] account deletion failed:', err);
+    return NextResponse.json({ error: 'delete_failed' }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, referrer: knownReferrer });

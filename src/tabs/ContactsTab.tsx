@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, UserPlus, ArrowRight, User, CheckCircle, AlertCircle, Star, Check, X, ArrowUp } from 'lucide-react';
 import { useStore, type Contact } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import ContactDetail from '../components/ContactDetail';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { formatSignedAmountMan } from '../utils/amountFormat';
@@ -130,13 +131,13 @@ export default function ContactsTab() {
       if (permission === 'denied' || permission === 'osPermissionDenied') {
         const result = await fetchContacts.openPermissionDialog();
         if (result === 'denied') {
-          alert('연락처 접근 권한이 필요합니다. 설정에서 허용해 주세요.');
+          toast.error('연락처 접근 권한이 필요합니다. 설정에서 허용해 주세요.');
           return;
         }
       } else if (permission === 'notDetermined') {
         const result = await fetchContacts.openPermissionDialog();
         if (result === 'denied') {
-          alert('연락처 접근 권한이 필요합니다.');
+          toast.error('연락처 접근 권한이 필요합니다.');
           return;
         }
       }

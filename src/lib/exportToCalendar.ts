@@ -1,4 +1,5 @@
 import { apiFetch } from './apiClient';
+import { isAppsInTossWebView, openExternalUrl } from './openExternalUrl';
 
 export interface ExportToCalendarResult {
   fileName: string;
@@ -53,14 +54,14 @@ async function openInSystemBrowser(url: string): Promise<'ait-openurl' | 'browse
       return 'ait-openurl';
     }
   } catch (err) {
-    console.warn('[ics] AIT openURL 실패, 브라우저 폴백 시도:', err);
+    console.warn('[ics] AIT openURL 실패:', err);
+    if (isAppsInTossWebView()) {
+      throw new Error('openurl_failed');
+    }
   }
-  // 브라우저 폴백 — 같은 창에서 attachment 다운로드 트리거 (안내 페이지 우회)
-  if (typeof window !== 'undefined') {
-    window.location.href = url;
-    return 'browser-redirect';
-  }
-  throw new Error('no_open_method');
+
+  // 브라우저 폴백 — Toss WebView 밖에서만 같은 창 다운로드 트리거.
+  return openExternalUrl(url);
 }
 
 export async function exportEventToCalendar(eventId: string): Promise<ExportToCalendarResult> {

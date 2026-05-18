@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/src/lib/prisma';
 import { fetchWithRetry, TOSS_API_BASE } from '@/src/lib/tossApiClient';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import { AUTH_COOKIE_NAME, getAuthenticatedSessionFromRequest } from '@/src/lib/apiAuth';
+import { deleteUserAccountData } from '@/src/lib/accountDeletion';
 
 export async function POST(req: NextRequest) {
   const session = await getAuthenticatedSessionFromRequest(req);
@@ -26,19 +26,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // DB 토큰 삭제
+  // 서비스 회원탈퇴: 사용자의 로컬 서비스 데이터 전체 삭제
   if (userId) {
     try {
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          accessToken: null,
-          refreshToken: null,
-          tokenExpiresAt: null,
-          sessionVersion: { increment: 1 },
-        },
-      });
-    } catch {}
+      await deleteUserAccountData(userId);
+    } catch (err) {
+      console.error('[auth/logout] account deletion failed:', err);
+      return withCors(
+        req,
+        NextResponse.json({ error: 'withdraw_failed' }, { status: 500 }),
+      );
+    }
   }
 
   const res = NextResponse.json({ ok: true });

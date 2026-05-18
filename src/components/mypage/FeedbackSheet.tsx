@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X as CloseIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/src/lib/apiClient';
+import { openExternalUrl } from '@/src/lib/openExternalUrl';
 import { useStore } from '@/src/store/useStore';
 import { useBackHandler } from '@/src/hooks/useBackHandler';
 
@@ -23,6 +24,18 @@ export default function FeedbackSheet({ open, onClose }: Props) {
     if (!sending) onClose();
     return true;
   });
+
+  const openMailFallback = async () => {
+    const url = `mailto:feedback@maeum-jungsan.com?subject=${encodeURIComponent(
+      '마음정산 의견',
+    )}&body=${encodeURIComponent(text)}`;
+    try {
+      await openExternalUrl(url);
+      toast.success('메일 앱이 열립니다.');
+    } catch {
+      toast.error('메일 앱을 열 수 없어요. feedback@maeum-jungsan.com으로 보내주세요.');
+    }
+  };
 
   const handleSend = async () => {
     if (!text.trim()) {
@@ -43,16 +56,10 @@ export default function FeedbackSheet({ open, onClose }: Props) {
         setText('');
         onClose();
       } else {
-        window.location.href = `mailto:feedback@maeum-jungsan.com?subject=${encodeURIComponent(
-          '마음정산 의견',
-        )}&body=${encodeURIComponent(text)}`;
-        toast.success('메일 앱이 열립니다.');
+        await openMailFallback();
       }
     } catch {
-      window.location.href = `mailto:feedback@maeum-jungsan.com?subject=${encodeURIComponent(
-        '마음정산 의견',
-      )}&body=${encodeURIComponent(text)}`;
-      toast.success('메일 앱이 열립니다.');
+      await openMailFallback();
     } finally {
       setSending(false);
     }

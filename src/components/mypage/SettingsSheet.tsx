@@ -3,7 +3,7 @@
 /**
  * MY 탭 헤더 톱니바퀴에서 열리는 전체화면 설정 시트.
  * 담는 섹션: 앱 설정 / 지원 / 계정 액션
- * 내부 인터랙션(테마·FAQ·피드백·로그아웃)은 기존 중첩 바텀시트/다이얼로그
+ * 내부 인터랙션(FAQ·피드백·회원탈퇴)은 기존 중첩 바텀시트/다이얼로그
  * 그대로 활용. z-index는 이 시트(z-[70])보다 위의 기존 시트들(z-[80~600])이
  * 자연스럽게 덮도록 유지.
  */
@@ -13,7 +13,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
-  Palette,
   HelpCircle,
   MessageSquare,
   Info,
@@ -23,12 +22,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStore } from '@/src/store/useStore';
-import { useTheme } from '@/src/lib/theme';
 import { apiFetch } from '@/src/lib/apiClient';
 import { useBackHandler } from '@/src/hooks/useBackHandler';
 
 import SettingsRow from './SettingsRow';
-import ThemePickerSheet from './ThemePickerSheet';
 import FaqSheet from './FaqSheet';
 import FeedbackSheet from './FeedbackSheet';
 import LogoutConfirmDialog from './LogoutConfirmDialog';
@@ -44,20 +41,11 @@ export default function SettingsSheet({ open, onClose }: Props) {
   const notificationsEnabled = useStore((s) => s.notificationsEnabled);
   const setNotificationsEnabled = useStore((s) => s.setNotificationsEnabled);
   const clearData = useStore((s) => s.clearData);
-  const { mode: themeMode, resolved: resolvedTheme } = useTheme();
 
-  const [themeOpen, setThemeOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
-
-  const themeLabel =
-    themeMode === 'system'
-      ? `시스템 · ${resolvedTheme === 'dark' ? '다크' : '라이트'}`
-      : themeMode === 'dark'
-      ? '다크'
-      : '라이트';
 
   const handleNotifToggle = async () => {
     if (!tossUserId) return;
@@ -78,24 +66,26 @@ export default function SettingsSheet({ open, onClose }: Props) {
     }
   };
 
-  const handleLogoutConfirm = async () => {
+  const handleWithdrawConfirm = async () => {
     try {
-      await apiFetch('/api/auth/logout', { method: 'POST' });
+      const res = await apiFetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) throw new Error('withdraw_failed');
+      toast.success('회원탈퇴가 완료되었습니다.');
+      clearData();
+      try {
+        localStorage.removeItem('heartbook-onboarding-seen');
+      } catch {}
+      setWithdrawOpen(false);
+      onClose();
+      router.replace('/');
     } catch {
-      // 서버 세션 정리가 실패해도 이 기기의 로컬 상태는 반드시 비운다.
+      toast.error('회원탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
-    clearData();
-    try {
-      localStorage.removeItem('heartbook-onboarding-seen');
-    } catch {}
-    setLogoutOpen(false);
-    onClose();
-    router.replace('/');
   };
 
   useBackHandler(open, () => {
-    if (logoutOpen) {
-      setLogoutOpen(false);
+    if (withdrawOpen) {
+      setWithdrawOpen(false);
       return true;
     }
 
@@ -106,11 +96,6 @@ export default function SettingsSheet({ open, onClose }: Props) {
 
     if (faqOpen) {
       setFaqOpen(false);
-      return true;
-    }
-
-    if (themeOpen) {
-      setThemeOpen(false);
       return true;
     }
 
@@ -186,12 +171,6 @@ export default function SettingsSheet({ open, onClose }: Props) {
                         : '허용하기'}
                     </button>
                   </div>
-                  <SettingsRow
-                    Icon={Palette}
-                    label="화면 테마"
-                    trailing={themeLabel}
-                    onClick={() => setThemeOpen(true)}
-                  />
                 </div>
               </section>
 
@@ -226,10 +205,10 @@ export default function SettingsSheet({ open, onClose }: Props) {
                   {tossUserId ? (
                     <SettingsRow
                       Icon={LogOut}
-                      label="로그아웃"
+                      label="회원탈퇴"
                       danger
                       hideChevron
-                      onClick={() => setLogoutOpen(true)}
+                      onClick={() => setWithdrawOpen(true)}
                     />
                   ) : (
                     <SettingsRow
@@ -247,20 +226,16 @@ export default function SettingsSheet({ open, onClose }: Props) {
             </div>
           </motion.div>
 
-          <ThemePickerSheet
-            open={themeOpen}
-            onClose={() => setThemeOpen(false)}
-          />
           <FaqSheet open={faqOpen} onClose={() => setFaqOpen(false)} />
           <FeedbackSheet
             open={feedbackOpen}
             onClose={() => setFeedbackOpen(false)}
           />
           <LogoutConfirmDialog
-            open={logoutOpen}
+            open={withdrawOpen}
             isLoggedIn={!!tossUserId}
-            onCancel={() => setLogoutOpen(false)}
-            onConfirm={handleLogoutConfirm}
+            onCancel={() => setWithdrawOpen(false)}
+            onConfirm={handleWithdrawConfirm}
           />
         </>
       )}

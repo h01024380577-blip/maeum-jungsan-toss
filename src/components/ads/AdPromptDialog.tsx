@@ -3,7 +3,7 @@
 /**
  * 크레딧 소진 시 광고 시청 여부를 묻는 확인 다이얼로그.
  * - 취소 시: onClose
- * - 광고 보기 시: 내부 RewardedAdButton이 nonce→load→show→redeem 전체 수행,
+ * - 광고 보기 시: 내부 RewardedAdButton이 사전 로드된 광고를 nonce→show→redeem 순서로 처리,
  *   onCharged 콜백으로 자동 닫힘
  */
 

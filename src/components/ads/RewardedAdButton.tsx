@@ -4,7 +4,14 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { PlayCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/src/lib/apiClient';
-import { getAdGroupId, isRewardedAdSupported, showRewardedAd } from '@/src/lib/ads';
+import {
+  getAdGroupId,
+  getRewardedAdLoadStatus,
+  isRewardedAdSupported,
+  preloadRewardedAd,
+  showRewardedAd,
+  type RewardedAdLoadStatus,
+} from '@/src/lib/ads';
 import { useStore } from '@/src/store/useStore';
 import type { RewardType } from '@prisma/client';
 import CreditGrantedDialog from './CreditGrantedDialog';
@@ -29,23 +36,57 @@ const LABELS: Record<RewardType, { idle: string }> = {
 
 export default function RewardedAdButton({ rewardType, className, label, onCharged }: Props) {
   const [supported, setSupported] = useState<boolean | null>(null);
+  const [loadStatus, setLoadStatus] = useState<RewardedAdLoadStatus>('idle');
   const [busy, setBusy] = useState(false);
   const [grantedBalance, setGrantedBalance] = useState<number | null>(null);
   const credits = useStore((s) => s.credits);
   const refreshCredits = useStore((s) => s.refreshCredits);
+  const adGroupId = getAdGroupId(rewardType);
 
   useEffect(() => {
-    isRewardedAdSupported().then(setSupported);
-  }, []);
+    let cancelled = false;
+    async function prepareAd() {
+      if (!adGroupId) {
+        setSupported(false);
+        setLoadStatus('failed');
+        return;
+      }
+
+      setLoadStatus(getRewardedAdLoadStatus(adGroupId));
+      const ok = await isRewardedAdSupported();
+      if (cancelled) return;
+      setSupported(ok);
+      if (!ok) {
+        setLoadStatus('unsupported');
+        return;
+      }
+
+      setLoadStatus(getRewardedAdLoadStatus(adGroupId));
+      const loaded = await preloadRewardedAd(adGroupId);
+      if (cancelled) return;
+      setLoadStatus(loaded ? 'loaded' : getRewardedAdLoadStatus(adGroupId));
+    }
+
+    void prepareAd();
+    return () => {
+      cancelled = true;
+    };
+  }, [adGroupId]);
 
   const slot = rewardType === 'AI_CREDIT' ? credits.ai : credits.csv;
-  const adGroupId = getAdGroupId(rewardType);
   // 활성 조건은 "잔고가 cap 미만" + "환경 미지원이 확정되지 않음".
-  // supported === null (로딩 중)은 낙관적으로 활성 — 클릭 시점에 다시 판정.
   // 오늘 광고 시청 상한(daily_ad_limit)도 클릭 시점에 서버에서 검사하므로
   // 여기서는 로컬 watchesRemaining만으로 선차단하지 않음.
   const capReached = slot.balance >= slot.cap;
-  const disabled = busy || supported === false || capReached || !adGroupId;
+  const adReady = supported === true && loadStatus === 'loaded';
+  const disabled = busy || !adReady || capReached || !adGroupId;
+
+  const refreshNextPreload = () => {
+    setLoadStatus(getRewardedAdLoadStatus(adGroupId));
+    void preloadRewardedAd(adGroupId).then((loaded) => {
+      setLoadStatus(loaded ? 'loaded' : getRewardedAdLoadStatus(adGroupId));
+    });
+  };
 
   const handleClick = async () => {
     if (busy) return;
@@ -57,15 +98,14 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
       toast.error('광고 설정이 아직 완료되지 않았어요.');
       return;
     }
-    if (supported === null) {
-      // 아직 판정 전이면 현재 프로미스를 대기 — 즉시 진행 가능
-      const ok = await isRewardedAdSupported();
-      if (!ok) {
-        toast.message('이 버전에서는 광고가 지원되지 않아요. 토스 앱을 최신 버전으로 업데이트해 주세요.');
-        setSupported(false);
-        return;
-      }
-      setSupported(true);
+    if (loadStatus !== 'loaded') {
+      toast.message(
+        loadStatus === 'failed'
+          ? '광고를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.'
+          : '광고를 준비하고 있어요. 잠시 후 다시 시도해 주세요.',
+      );
+      refreshNextPreload();
+      return;
     }
     if (slot.balance >= slot.cap) {
       toast.message(`크레딧이 가득 찼어요 (최대 ${slot.cap}회).`);
@@ -95,8 +135,9 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
       }
       const { nonce } = await nonceRes.json();
 
-      // 2) 광고 load+show
+      // 2) 사전에 로드된 광고 show
       const outcome = await showRewardedAd(adGroupId);
+      refreshNextPreload();
       if (!outcome.earnedReward) {
         toast.message('광고를 끝까지 시청해야 보상을 받을 수 있어요.');
         return;
@@ -120,6 +161,7 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
       setGrantedBalance(result.balance);
     } catch {
       toast.error('광고 로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      refreshNextPreload();
     } finally {
       setBusy(false);
     }
@@ -147,6 +189,11 @@ export default function RewardedAdButton({ rewardType, className, label, onCharg
         }
       >
         {busy ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            <span>광고 재생 중…</span>
+          </>
+        ) : supported === true && loadStatus !== 'loaded' && !capReached ? (
           <>
             <Loader2 size={14} className="animate-spin" />
             <span>광고 준비 중…</span>
