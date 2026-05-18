@@ -31,6 +31,18 @@ const requiredEntries = [
 
 const missingEntries = requiredEntries.filter((entry) => !entrySet.has(entry));
 const hasNextStatic = entries.some((entry) => entry.startsWith('web/_next/static/'));
+const forbiddenEntryPrefixes = [
+  'web/build/',
+  'web/cache/',
+  'web/dev/',
+  'web/diagnostics/',
+  'web/node_modules/',
+  'web/server/',
+  'web/types/',
+];
+const forbiddenEntries = entries.filter((entry) =>
+  forbiddenEntryPrefixes.some((prefix) => entry.startsWith(prefix))
+);
 
 if (missingEntries.length > 0) {
   fail(`missing required entries: ${missingEntries.join(', ')}`);
@@ -38,6 +50,10 @@ if (missingEntries.length > 0) {
 
 if (!hasNextStatic) {
   fail('missing Next.js static assets under web/_next/static/');
+}
+
+if (forbiddenEntries.length > 0) {
+  fail(`contains server/build-only entries: ${forbiddenEntries.slice(0, 10).join(', ')}`);
 }
 
 console.log(
