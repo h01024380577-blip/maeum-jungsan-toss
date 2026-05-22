@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Papa from 'papaparse';
-import { X, Upload, Check, AlertCircle, Table as TableIcon, Sparkles, Database, Image as ImageIcon, FileSpreadsheet, ChevronRight, ArrowLeft, Trash2, Heart, Flower2, Cake, Star } from 'lucide-react';
+import { X, Upload, Check, AlertCircle, Table as TableIcon, Sparkles, Database, Image as ImageIcon, FileSpreadsheet, ChevronRight, ArrowLeft, Heart, Flower2, Cake, Star } from 'lucide-react';
 import { parseCSVFile, cleanAmount, cleanDate, normalizeEventType, RawCSVData } from '../utils/csvParser';
 import { useStore, type EventType } from '../store/useStore';
 import { apiFetch } from '../lib/apiClient';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { formatAmountMan, formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
+import { buildDepositBulkEntries } from '../lib/depositImportRows';
 
 interface BackupRow {
   targetName: string;
@@ -40,6 +41,7 @@ interface DepositRow extends DepositCandidate {
   _key: string;
   _selected: boolean;
   _eventType: EventType;
+  _relation: string;
 }
 
 const BACKUP_REQUIRED_HEADERS = ['날짜', '구분', '이름', '금액', '종류'];
@@ -49,6 +51,13 @@ const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.Compon
   { value: 'funeral', label: '부고', Icon: Flower2 },
   { value: 'birthday', label: '생일', Icon: Cake },
   { value: 'other', label: '기타', Icon: Star },
+];
+
+const RELATION_OPTIONS = [
+  { value: '가족', label: '가족' },
+  { value: '친구', label: '친구' },
+  { value: '직장 동료', label: '직장' },
+  { value: '지인', label: '지인' },
 ];
 
 type TossPermissionStatus = 'notDetermined' | 'denied' | 'allowed';
@@ -191,6 +200,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         _key: `${now}-${index}`,
         _selected: row.isLikelyEventRelated !== false,
         _eventType: 'other',
+        _relation: '지인',
       })));
       setImportMode('deposit');
       setStep('depositReview');
@@ -357,26 +367,25 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     )));
   };
 
-  const removeDepositRow = (key: string) => {
-    setDepositRows((prev) => prev.filter((row) => row._key !== key));
+  const updateDepositRelation = (key: string, relation: string) => {
+    setDepositRows((prev) => prev.map((row) => (
+      row._key === key ? { ...row, _relation: relation } : row
+    )));
   };
 
   const handleDepositImport = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const processed = depositRows
-      .filter((row) => row._selected && row.senderName.trim() && row.amount > 0)
-      .map((row) => ({
-        targetName: row.senderName.trim(),
-        amount: row.amount,
-        date: row.date || today,
-        eventType: row._eventType,
-        location: row.bank || '입금내역',
-        relation: '지인',
-        type: 'INCOME' as const,
-        isIncome: true,
-        memo: row.memo || row.reason || '입금내역 화면 가져오기',
-        account: row.bank || '',
-      }));
+    const processed = buildDepositBulkEntries(depositRows.map((row) => ({
+      senderName: row.senderName,
+      amount: row.amount,
+      bank: row.bank,
+      date: row.date,
+      memo: row.memo,
+      reason: row.reason,
+      eventType: row._eventType,
+      relation: row._relation,
+      selected: row._selected,
+    })), today);
 
     if (processed.length === 0) {
       setError('저장할 항목이 없어요.');
@@ -847,15 +856,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                                 className="min-w-0 flex-1 bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-blue-300"
                                 disabled={!row._selected}
                               />
-                              <ConfidenceBadge level={row.confidence} />
-                              <button
-                                type="button"
-                                onClick={() => removeDepositRow(row._key)}
-                                className="p-1 hover:bg-gray-100 rounded"
-                                aria-label="삭제"
-                              >
-                                <Trash2 size={12} className="text-gray-400" />
-                              </button>
                             </div>
 
                             <div className="flex items-center justify-between gap-2">
@@ -881,34 +881,46 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                             <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-400">
                               {row.bank && <span>{row.bank}</span>}
                               {row.memo && <span>· {row.memo}</span>}
-                              {!row.isLikelyEventRelated && (
-                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-bold text-amber-600">
-                                  제외 추천
-                                </span>
-                              )}
                               {row.reason && <span className="min-w-0 truncate">· {row.reason}</span>}
                             </div>
 
                             {row._selected && (
-                              <div className="grid grid-cols-4 gap-1 pt-1">
-                                {EVENT_OPTIONS.map(({ value, label, Icon }) => {
-                                  const active = row._eventType === value;
-                                  return (
-                                    <button
-                                      key={value}
-                                      type="button"
-                                      onClick={() => updateDepositEventType(row._key, value)}
-                                      className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                                        active
-                                          ? 'bg-blue-600 text-white shadow-sm'
-                                          : 'bg-gray-50 text-gray-500 border border-gray-100'
-                                      }`}
-                                    >
-                                      <Icon size={11} className={active ? 'text-white' : 'text-gray-400'} />
-                                      <span>{label}</span>
-                                    </button>
-                                  );
-                                })}
+                              <div className="space-y-1 pt-1">
+                                <div className="grid grid-cols-4 gap-1">
+                                  {RELATION_OPTIONS.map(({ value, label }) => {
+                                    const active = row._relation === value;
+                                    return (
+                                      <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => updateDepositRelation(row._key, value)}
+                                        className={`py-1.5 rounded-lg text-[11px] font-bold transition-all ${active ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="grid grid-cols-4 gap-1">
+                                  {EVENT_OPTIONS.map(({ value, label, Icon }) => {
+                                    const active = row._eventType === value;
+                                    return (
+                                      <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => updateDepositEventType(row._key, value)}
+                                        className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                                          active
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : 'bg-gray-50 text-gray-500 border border-gray-100'
+                                        }`}
+                                      >
+                                        <Icon size={11} className={active ? 'text-white' : 'text-gray-400'} />
+                                        <span>{label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1042,19 +1054,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   );
 }
 
-function ConfidenceBadge({ level }: { level: Confidence }) {
-  const styles: Record<Confidence, string> = {
-    high: 'bg-blue-50 text-blue-600',
-    medium: 'bg-gray-100 text-gray-500',
-    low: 'bg-amber-50 text-amber-600',
-  };
-  const labels: Record<Confidence, string> = { high: '확실', medium: '보통', low: '불확실' };
-  return (
-    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${styles[level]}`}>
-      {labels[level]}
-    </span>
-  );
-}
 
 function MappingSelect({ label, value, headers, onChange }: { label: string, value: number, headers: { name: string, index: number }[], onChange: (idx: number) => void }) {
   return (
