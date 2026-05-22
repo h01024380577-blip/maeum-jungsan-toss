@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clipboard, Sparkles, Check, AlertCircle, Trash2, Users, Heart, Flower2, Cake, Star } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { apiFetch } from '@/src/lib/apiClient';
 import { useStore, type Contact, type EventType, type TransactionSource } from '@/src/store/useStore';
 import { formatManInputValue, parseManInputToWon } from '@/src/utils/amountFormat';
 import { useBackHandler } from '@/src/hooks/useBackHandler';
+import { AI_ANALYSIS_FAILED_MESSAGE, ERROR_TOAST_AUTO_DISMISS_MS } from '@/src/lib/aiErrorMessage';
 
 const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
   { value: 'wedding', label: '결혼', Icon: Heart },
@@ -114,6 +115,12 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
     return true;
   });
 
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(null), ERROR_TOAST_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
   const handlePaste = async () => {
     setError(null);
     try {
@@ -145,7 +152,7 @@ export default function PasteIncomeSheet({ isOpen, onClose }: Props) {
         } else if (reason === 'unauthorized') {
           setError('로그인이 필요해요.');
         } else {
-          setError(json?.message || 'AI 분석에 실패했습니다.');
+          setError(json?.message || AI_ANALYSIS_FAILED_MESSAGE);
         }
         return;
       }

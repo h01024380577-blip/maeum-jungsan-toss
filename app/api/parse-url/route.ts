@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AI_ANALYSIS_FAILED_MESSAGE } from '@/src/lib/aiErrorMessage';
 import { GoogleGenAI } from '@google/genai';
 import { fetchPageHtml } from '@/src/lib/fetchPage';
 import { assertSafePublicUrl } from '@/src/lib/urlSafety';
@@ -271,7 +272,7 @@ ${OUTPUT_SCHEMA}`;
         return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
       }
       return withCors(request, NextResponse.json(
-        { success: false, reason: 'ai_failed', message: 'AI 분석에 실패했습니다.' },
+        { success: false, reason: 'ai_failed', message: AI_ANALYSIS_FAILED_MESSAGE },
         { status: 500 },
       ));
     }

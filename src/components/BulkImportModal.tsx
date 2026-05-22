@@ -11,6 +11,7 @@ import { formatAmountMan, formatManInputValue, parseManInputToWon } from '../uti
 import { useBackHandler } from '../hooks/useBackHandler';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { buildDepositBulkEntries, buildDepositReviewRows } from '../lib/depositImportRows';
+import { AI_ANALYSIS_FAILED_MESSAGE, ERROR_TOAST_AUTO_DISMISS_MS } from '@/src/lib/aiErrorMessage';
 
 interface BackupRow {
   targetName: string;
@@ -189,7 +190,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         } else if (reason === 'rate_limit') {
           setError(json.message || '잠시 후 다시 시도해주세요.');
         } else {
-          setError(json?.message || '입금내역 화면 분석에 실패했어요.');
+          setError(json?.message || AI_ANALYSIS_FAILED_MESSAGE);
         }
         return;
       }
@@ -545,6 +546,12 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     handleClose();
     return true;
   });
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(null), ERROR_TOAST_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [error]);
 
   const allRows = importMode === 'backup' ? (backupRows ?? []) : processRows();
   const previewRows = allRows.slice(0, 3);

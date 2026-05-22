@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AI_ANALYSIS_FAILED_MESSAGE } from '@/src/lib/aiErrorMessage';
 import { GoogleGenAI } from '@google/genai';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import { isRateLimitError, parseAiResponse, RATE_LIMIT_RESPONSE } from '@/src/lib/geminiHelpers';
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
       return withCors(req, NextResponse.json(RATE_LIMIT_RESPONSE, { status: 429 }));
     }
     return withCors(req, NextResponse.json(
-      { success: false, reason: 'ai_failed', message: 'AI 분석에 실패했습니다.' },
+      { success: false, reason: 'ai_failed', message: AI_ANALYSIS_FAILED_MESSAGE },
       { status: 500 },
     ));
   }
