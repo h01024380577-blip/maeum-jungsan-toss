@@ -19,6 +19,7 @@ import {
   type BulkTransactionType,
 } from '@/src/lib/bulkEntryDedup';
 import { normalizeImportMemo } from '@/src/lib/memoSanitization';
+import { verifyCsvCreditBypassToken } from '@/src/lib/importCreditToken';
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req);
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const rawEntries = Array.isArray(body?.entries) ? body.entries : null;
+  const creditToken = typeof body?.creditToken === 'string' ? body.creditToken : null;
   if (!rawEntries || rawEntries.length === 0) {
     return withCors(req, NextResponse.json({ error: 'empty_entries' }, { status: 400 }));
   }
@@ -95,7 +97,8 @@ export async function POST(req: NextRequest) {
 
   // CSV 크레딧 가드 (env로 on/off)
   const guardOn = isGuardEnabled('CSV_CREDIT');
-  if (guardOn) {
+  const creditAlreadyConsumed = guardOn && verifyCsvCreditBypassToken(creditToken, userId);
+  if (guardOn && !creditAlreadyConsumed) {
     const consumed = await consumeCredit(userId, 'CSV_CREDIT');
     if (!consumed) {
       return withCors(req, NextResponse.json(
@@ -230,7 +233,7 @@ export async function POST(req: NextRequest) {
       return { inserted, skipped };
     });
 
-    if (guardOn && result.inserted === 0) {
+    if (guardOn && !creditAlreadyConsumed && result.inserted === 0) {
       await refundCredit(userId, 'CSV_CREDIT');
     }
 
@@ -245,7 +248,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     // 0건 저장 실패 → CSV 크레딧 환불
-    if (guardOn) await refundCredit(userId, 'CSV_CREDIT');
+    if (guardOn && !creditAlreadyConsumed) await refundCredit(userId, 'CSV_CREDIT');
     const message = err instanceof Error ? err.message : String(err);
     console.error('[bulk] insert failed:', message);
     return withCors(

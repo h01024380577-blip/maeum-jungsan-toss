@@ -14,14 +14,19 @@ vi.mock('@/src/lib/credits', () => ({
   refundCredit: vi.fn(),
 }));
 
+vi.mock('@/src/lib/importCreditToken', () => ({
+  verifyCsvCreditBypassToken: vi.fn(),
+}));
+
 import { prisma } from '@/src/lib/prisma';
-import { isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
+import { consumeCredit, isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
+import { verifyCsvCreditBypassToken } from '@/src/lib/importCreditToken';
 import { POST } from './route';
 
-function makeRequest(entries: unknown[]) {
+function makeRequest(entries: unknown[], creditToken?: string) {
   return new NextRequest('https://maeum-jungsan.test/api/entries/bulk', {
     method: 'POST',
-    body: JSON.stringify({ entries }),
+    body: JSON.stringify({ entries, creditToken }),
   });
 }
 
@@ -51,6 +56,25 @@ describe('/api/entries/bulk POST duplicate handling', () => {
     vi.clearAllMocks();
     vi.mocked(resolveDbUserId).mockResolvedValue('user-1');
     vi.mocked(isGuardEnabled).mockReturnValue(false);
+    vi.mocked(verifyCsvCreditBypassToken).mockReturnValue(false);
+  });
+
+
+  it('does not consume CSV credit again when a valid deposit analysis token is provided', async () => {
+    vi.mocked(isGuardEnabled).mockReturnValue(true);
+    vi.mocked(verifyCsvCreditBypassToken).mockReturnValue(true);
+    const tx = makeTx();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
+
+    const response = await POST(makeRequest([
+      { targetName: '문서준', amount: '1.6만', date: '2026-05-02', type: 'INCOME' },
+    ], 'credit-token-1'));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toMatchObject({ success: true, inserted: 1, attempted: 1 });
+    expect(verifyCsvCreditBypassToken).toHaveBeenCalledWith('credit-token-1', 'user-1');
+    expect(consumeCredit).not.toHaveBeenCalled();
   });
 
   it('skips legacy existing entries whose importFingerprint is null', async () => {

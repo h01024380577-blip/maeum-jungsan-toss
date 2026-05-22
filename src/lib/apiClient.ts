@@ -18,6 +18,7 @@ const TOKEN_KEY = 'heartbook-auth-token';
 const CREDIT_SYNC_PATHS = [
   '/api/parse-url',
   '/api/analyze',
+  '/api/parse-deposit-image',
   '/api/entries/bulk',
   '/api/credits/ad-redeem',
   '/api/credits/ad-nonce',

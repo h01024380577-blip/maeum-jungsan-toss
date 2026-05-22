@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { corsResponse, withCors } from '@/src/lib/cors';
-import { getAuthenticatedUserId } from '@/src/lib/apiAuth';
 import { isRateLimitError, parseAiResponse, RATE_LIMIT_RESPONSE } from '@/src/lib/geminiHelpers';
 import { normalizeDepositImageBatch } from '@/src/lib/parseDepositImage';
+import { consumeCredit, isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
+import { mintCsvCreditBypassToken } from '@/src/lib/importCreditToken';
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req);
@@ -36,7 +37,7 @@ const SYSTEM_INSTRUCTION = `너는 한국 은행/토스/카카오페이 입금�
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getAuthenticatedUserId();
+    const userId = await resolveDbUserId(req);
     if (!userId) {
       return withCors(req, NextResponse.json(
         { success: false, reason: 'unauthorized', message: '로그인이 필요합니다.' },
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
       ));
     }
 
+    const guardOn = isGuardEnabled('CSV_CREDIT');
     const { data, mimeType } = splitImageDataUri(image);
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
@@ -77,10 +79,21 @@ export async function POST(req: NextRequest) {
     const parsed = parseAiResponse(response.text || '{}');
     const normalized = normalizeDepositImageBatch(parsed);
 
+    if (guardOn) {
+      const consumed = await consumeCredit(userId, 'CSV_CREDIT');
+      if (!consumed) {
+        return withCors(req, NextResponse.json(
+          { success: false, reason: 'no_credits', rewardType: 'CSV_CREDIT', message: '대량 가져오기 크레딧이 부족합니다.' },
+          { status: 402 },
+        ));
+      }
+    }
+
     return withCors(req, NextResponse.json({
       success: true,
       data: normalized,
       source: 'gemini-image',
+      creditToken: guardOn ? mintCsvCreditBypassToken(userId) : null,
     }));
   } catch (e: unknown) {
     console.error('[parse-deposit-image] error:', (e as Error)?.message);

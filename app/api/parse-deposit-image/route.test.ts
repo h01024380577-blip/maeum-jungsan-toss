@@ -9,11 +9,17 @@ vi.mock('@google/genai', () => ({
   }),
 }));
 
-vi.mock('@/src/lib/apiAuth', () => ({
-  getAuthenticatedUserId: vi.fn(),
+vi.mock('@/src/lib/credits', () => ({
+  isGuardEnabled: vi.fn(),
+  consumeCredit: vi.fn(),
+  resolveDbUserId: vi.fn(),
 }));
 
-import { getAuthenticatedUserId } from '@/src/lib/apiAuth';
+vi.mock('@/src/lib/importCreditToken', () => ({
+  mintCsvCreditBypassToken: vi.fn(() => 'credit-token-1'),
+}));
+
+import { consumeCredit, isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
 import { POST } from './route';
 
 function makeRequest(image = 'data:image/jpeg;base64,abc123') {
@@ -27,7 +33,9 @@ describe('/api/parse-deposit-image POST', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GEMINI_API_KEY = 'test-key';
-    vi.mocked(getAuthenticatedUserId).mockResolvedValue('user-1');
+    vi.mocked(resolveDbUserId).mockResolvedValue('user-1');
+    vi.mocked(isGuardEnabled).mockReturnValue(true);
+    vi.mocked(consumeCredit).mockResolvedValue(true);
   });
 
   it('returns normalized deposit candidates from a screenshot', async () => {
@@ -65,11 +73,25 @@ describe('/api/parse-deposit-image POST', () => {
         },
       ],
       source: 'gemini-image',
+      creditToken: 'credit-token-1',
     });
+    expect(consumeCredit).toHaveBeenCalledWith('user-1', 'CSV_CREDIT');
+  });
+
+
+  it('does not consume CSV credit when AI analysis fails', async () => {
+    generateContent.mockRejectedValue(new Error('model failed'));
+
+    const response = await POST(makeRequest());
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json).toMatchObject({ success: false, reason: 'ai_failed' });
+    expect(consumeCredit).not.toHaveBeenCalled();
   });
 
   it('requires login before analyzing screenshots', async () => {
-    vi.mocked(getAuthenticatedUserId).mockResolvedValue(null);
+    vi.mocked(resolveDbUserId).mockResolvedValue(null);
 
     const response = await POST(makeRequest());
     const json = await response.json();
@@ -77,5 +99,6 @@ describe('/api/parse-deposit-image POST', () => {
     expect(response.status).toBe(401);
     expect(json).toMatchObject({ success: false, reason: 'unauthorized' });
     expect(generateContent).not.toHaveBeenCalled();
+    expect(consumeCredit).not.toHaveBeenCalled();
   });
 });

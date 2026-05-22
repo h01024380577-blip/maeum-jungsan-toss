@@ -106,6 +106,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   const [backupRows, setBackupRows] = useState<BackupRow[] | null>(null);
   const [depositRows, setDepositRows] = useState<DepositRow[]>([]);
   const [isAnalyzingDeposit, setIsAnalyzingDeposit] = useState(false);
+  const [depositCreditToken, setDepositCreditToken] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const depositFileInputRef = useRef<HTMLInputElement>(null);
@@ -179,7 +180,10 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       const json: any = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         const reason = json?.reason;
-        if (reason === 'unauthorized') {
+        if (reason === 'no_credits') {
+          setError(null);
+          setAdPromptOpen(true);
+        } else if (reason === 'unauthorized') {
           setError('로그인이 필요해요.');
         } else if (reason === 'rate_limit') {
           setError(json.message || '잠시 후 다시 시도해주세요.');
@@ -196,6 +200,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       }
 
       setDepositRows(buildDepositReviewRows(parsed));
+      setDepositCreditToken(typeof json.creditToken === 'string' ? json.creditToken : null);
       setImportMode('deposit');
       setStep('depositReview');
     } catch {
@@ -373,6 +378,11 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     )));
   };
 
+  const toggleAllDepositRows = () => {
+    const nextSelected = !allDepositRowsSelected;
+    setDepositRows((prev) => prev.map((row) => ({ ...row, _selected: nextSelected })));
+  };
+
   const handleDepositImport = async () => {
     const today = new Date().toISOString().split('T')[0];
     const processed = buildDepositBulkEntries(depositRows.map((row) => ({
@@ -395,7 +405,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
 
     setIsImporting(true);
     try {
-      const result = await bulkAddEntries(processed as any);
+      const result = await bulkAddEntries(processed as any, { creditToken: depositCreditToken });
       if (result.inserted > 0) {
         toast.success(`${result.inserted}건을 가져왔어요`, {
           description: result.skipped > 0
@@ -482,6 +492,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setImportMode('general');
     setBackupRows(null);
     setDepositRows([]);
+    setDepositCreditToken(null);
     setIsAnalyzingDeposit(false);
   };
 
@@ -535,6 +546,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     : 0;
   const expenseCount = importMode === 'backup' ? totalCount - incomeCount : 0;
   const selectedDepositCount = depositRows.filter((row) => row._selected).length;
+  const allDepositRowsSelected = depositRows.length > 0 && selectedDepositCount === depositRows.length;
   const isBusy = isImporting || isAnalyzingDeposit;
 
   return (
@@ -815,14 +827,21 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                     <ArrowLeft size={14} />
                     <span>다시 선택</span>
                   </button>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full">
-                    선택 {selectedDepositCount}건
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleAllDepositRows}
+                      disabled={isImporting || depositRows.length === 0}
+                      className="text-[10px] font-bold text-gray-600 bg-gray-50 border border-gray-100 px-2 py-1 rounded-full disabled:opacity-40"
+                    >
+                      {allDepositRowsSelected ? '전체 해제' : '전체 선택'}
+                    </button>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full">
+                      선택 {selectedDepositCount}건
+                    </span>
+                  </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-2xl p-3 text-xs text-gray-500 leading-relaxed">
-                  경조사와 무관한 입금은 체크를 해제하세요. 저장할 때 대량 가져오기 크레딧이 차감됩니다.
-                </div>
 
                 <div className="space-y-2">
                   {depositRows.length === 0 ? (
@@ -853,7 +872,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                             <input
                               value={row.senderName}
                               onChange={(e) => updateDepositField(row._key, 'senderName', e.target.value)}
-                              className="min-w-0 flex-1 bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-blue-300"
+                              className="min-w-0 flex-1 bg-transparent text-base font-bold outline-none border-b border-transparent focus:border-blue-300"
                               disabled={!row._selected}
                             />
 
@@ -862,17 +881,17 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                                 value={formatManInputValue(row.amount)}
                                 onChange={(e) => updateDepositField(row._key, 'amount', e.target.value)}
                                 inputMode="decimal"
-                                className="w-12 bg-transparent font-bold text-blue-600 text-sm outline-none border-b border-transparent focus:border-blue-300 text-right"
+                                className="w-14 bg-transparent text-base font-bold text-blue-600 outline-none border-b border-transparent focus:border-blue-300 text-right"
                                 disabled={!row._selected}
                               />
-                              <span className="text-xs text-blue-600 font-bold">만</span>
+                              <span className="text-sm text-blue-600 font-bold">만</span>
                             </div>
 
                             <input
                               type="date"
                               value={row.date || ''}
                               onChange={(e) => updateDepositField(row._key, 'date', e.target.value)}
-                              className="w-[112px] shrink-0 bg-gray-50 rounded-lg px-1.5 py-1.5 text-[10px] text-gray-500 outline-none focus:ring-2 focus:ring-blue-100"
+                              className="w-[118px] shrink-0 bg-gray-50 rounded-lg px-1.5 py-1.5 text-xs font-medium text-gray-600 outline-none focus:ring-2 focus:ring-blue-100"
                               disabled={!row._selected}
                             />
                           </div>

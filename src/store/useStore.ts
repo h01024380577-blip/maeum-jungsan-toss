@@ -78,7 +78,7 @@ interface AppState {
   removeContact: (id: string) => Promise<void>;
   syncContacts: (contacts: Omit<Contact, 'id' | 'userId'>[]) => Promise<{ inserted: number; skipped: number; attempted: number }>;
   addFeedback: (original: any, corrected: any) => void;
-  bulkAddEntries: (entries: Omit<EventEntry, 'id' | 'createdAt' | 'userId'>[]) => Promise<{ inserted: number; skipped: number; attempted: number }>;
+  bulkAddEntries: (entries: Omit<EventEntry, 'id' | 'createdAt' | 'userId'>[], options?: { creditToken?: string | null }) => Promise<{ inserted: number; skipped: number; attempted: number }>;
   refreshCredits: () => Promise<void>;
   clearData: () => void;
   setNotificationsEnabled: (enabled: boolean) => void;
@@ -255,10 +255,10 @@ export const useStore = create<AppState>()((set, get) => ({
     };
   },
 
-  bulkAddEntries: async (entries) => {
+  bulkAddEntries: async (entries, options) => {
     const res = await apiFetch('/api/entries/bulk', {
       method: 'POST',
-      body: JSON.stringify({ entries }),
+      body: JSON.stringify({ entries, creditToken: options?.creditToken ?? null }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
