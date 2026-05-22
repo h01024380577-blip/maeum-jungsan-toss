@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { buildDepositBulkEntries } from './depositImportRows';
+import { buildDepositBulkEntries, buildDepositReviewRows } from './depositImportRows';
+
+describe('buildDepositReviewRows', () => {
+  it('starts every parsed deposit candidate selected so users can opt out', () => {
+    const result = buildDepositReviewRows([
+      {
+        senderName: '문서준',
+        amount: 16000,
+        bank: null,
+        date: '2026-05-02',
+        memo: '',
+        confidence: 'low',
+        isLikelyEventRelated: false,
+        reason: '경조사 여부 불명확',
+      },
+    ], 123);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        _key: '123-0',
+        _selected: true,
+        _eventType: 'other',
+        _relation: '지인',
+      }),
+    ]);
+  });
+});
 
 describe('buildDepositBulkEntries', () => {
   it('uses the selected relationship when building bulk entries', () => {
@@ -12,7 +38,7 @@ describe('buildDepositBulkEntries', () => {
         memo: '',
         reason: '',
         eventType: 'other',
-        relation: '직장 동료',
+        relation: '친구',
         selected: true,
       },
     ], '2026-05-22');
@@ -20,11 +46,33 @@ describe('buildDepositBulkEntries', () => {
     expect(result).toEqual([
       expect.objectContaining({
         targetName: '송재근',
-        relation: '직장 동료',
+        relation: '친구',
         type: 'INCOME',
         isIncome: true,
       }),
     ]);
+  });
+
+
+  it('uses the custom relationship when 기타 is selected', () => {
+    const result = buildDepositBulkEntries([
+      {
+        senderName: '문서준',
+        amount: 16000,
+        bank: null,
+        date: '2026-05-02',
+        memo: '',
+        reason: '',
+        eventType: 'other',
+        relation: '기타',
+        customRelation: '동호회',
+        selected: true,
+      },
+    ], '2026-05-22');
+
+    expect(result[0]).toEqual(expect.objectContaining({
+      relation: '동호회',
+    }));
   });
 
   it('filters unselected or invalid rows', () => {

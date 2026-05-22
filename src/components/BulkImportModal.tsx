@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { formatAmountMan, formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
-import { buildDepositBulkEntries } from '../lib/depositImportRows';
+import { buildDepositBulkEntries, buildDepositReviewRows } from '../lib/depositImportRows';
 
 interface BackupRow {
   targetName: string;
@@ -42,6 +42,7 @@ interface DepositRow extends DepositCandidate {
   _selected: boolean;
   _eventType: EventType;
   _relation: string;
+  _customRelation: string;
 }
 
 const BACKUP_REQUIRED_HEADERS = ['날짜', '구분', '이름', '금액', '종류'];
@@ -56,8 +57,8 @@ const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.Compon
 const RELATION_OPTIONS = [
   { value: '가족', label: '가족' },
   { value: '친구', label: '친구' },
-  { value: '직장 동료', label: '직장' },
   { value: '지인', label: '지인' },
+  { value: '기타', label: '기타' },
 ];
 
 type TossPermissionStatus = 'notDetermined' | 'denied' | 'allowed';
@@ -194,14 +195,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         return;
       }
 
-      const now = Date.now();
-      setDepositRows(parsed.map((row, index) => ({
-        ...row,
-        _key: `${now}-${index}`,
-        _selected: row.isLikelyEventRelated !== false,
-        _eventType: 'other',
-        _relation: '지인',
-      })));
+      setDepositRows(buildDepositReviewRows(parsed));
       setImportMode('deposit');
       setStep('depositReview');
     } catch {
@@ -373,6 +367,12 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     )));
   };
 
+  const updateDepositCustomRelation = (key: string, customRelation: string) => {
+    setDepositRows((prev) => prev.map((row) => (
+      row._key === key ? { ...row, _customRelation: customRelation } : row
+    )));
+  };
+
   const handleDepositImport = async () => {
     const today = new Date().toISOString().split('T')[0];
     const processed = buildDepositBulkEntries(depositRows.map((row) => ({
@@ -384,6 +384,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       reason: row.reason,
       eventType: row._eventType,
       relation: row._relation,
+      customRelation: row._customRelation,
       selected: row._selected,
     })), today);
 
@@ -836,48 +837,47 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                           row._selected ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-100 opacity-60'
                         }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleDepositRow(row._key)}
-                            className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                              row._selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
-                            }`}
-                            aria-label={row._selected ? '선택 해제' : '선택'}
-                          >
-                            {row._selected && <Check size={12} className="text-white" />}
-                          </button>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleDepositRow(row._key)}
+                              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
+                                row._selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
+                              }`}
+                              aria-label={row._selected ? '선택 해제' : '선택'}
+                            >
+                              {row._selected && <Check size={12} className="text-white" />}
+                            </button>
 
-                          <div className="min-w-0 flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
+                            <input
+                              value={row.senderName}
+                              onChange={(e) => updateDepositField(row._key, 'senderName', e.target.value)}
+                              className="min-w-0 flex-1 bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-blue-300"
+                              disabled={!row._selected}
+                            />
+
+                            <div className="flex items-center space-x-1 shrink-0">
                               <input
-                                value={row.senderName}
-                                onChange={(e) => updateDepositField(row._key, 'senderName', e.target.value)}
-                                className="min-w-0 flex-1 bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-blue-300"
+                                value={formatManInputValue(row.amount)}
+                                onChange={(e) => updateDepositField(row._key, 'amount', e.target.value)}
+                                inputMode="decimal"
+                                className="w-12 bg-transparent font-bold text-blue-600 text-sm outline-none border-b border-transparent focus:border-blue-300 text-right"
                                 disabled={!row._selected}
                               />
+                              <span className="text-xs text-blue-600 font-bold">만</span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center space-x-1">
-                                <input
-                                  value={formatManInputValue(row.amount)}
-                                  onChange={(e) => updateDepositField(row._key, 'amount', e.target.value)}
-                                  inputMode="decimal"
-                                  className="w-24 bg-transparent font-bold text-blue-600 text-sm outline-none border-b border-transparent focus:border-blue-300 text-right"
-                                  disabled={!row._selected}
-                                />
-                                <span className="text-xs text-blue-600 font-bold">만</span>
-                              </div>
-                              <input
-                                type="date"
-                                value={row.date || ''}
-                                onChange={(e) => updateDepositField(row._key, 'date', e.target.value)}
-                                className="min-w-0 w-[128px] bg-gray-50 rounded-lg px-2 py-1.5 text-[11px] text-gray-500 outline-none focus:ring-2 focus:ring-blue-100"
-                                disabled={!row._selected}
-                              />
-                            </div>
+                            <input
+                              type="date"
+                              value={row.date || ''}
+                              onChange={(e) => updateDepositField(row._key, 'date', e.target.value)}
+                              className="w-[112px] shrink-0 bg-gray-50 rounded-lg px-1.5 py-1.5 text-[10px] text-gray-500 outline-none focus:ring-2 focus:ring-blue-100"
+                              disabled={!row._selected}
+                            />
+                          </div>
 
+                          <div className="pl-7 space-y-2">
                             <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-400">
                               {row.bank && <span>{row.bank}</span>}
                               {row.memo && <span>· {row.memo}</span>}
@@ -901,6 +901,14 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                                     );
                                   })}
                                 </div>
+                                {row._relation === '기타' && (
+                                  <input
+                                    value={row._customRelation}
+                                    onChange={(e) => updateDepositCustomRelation(row._key, e.target.value)}
+                                    placeholder="관계 직접 입력"
+                                    className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-100"
+                                  />
+                                )}
                                 <div className="grid grid-cols-4 gap-1">
                                   {EVENT_OPTIONS.map(({ value, label, Icon }) => {
                                     const active = row._eventType === value;
