@@ -77,6 +77,30 @@ describe('/api/entries/bulk POST duplicate handling', () => {
     expect(consumeCredit).not.toHaveBeenCalled();
   });
 
+  it('stores custom event name for 기타 bulk entries', async () => {
+    const tx = makeTx();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
+
+    const response = await POST(makeRequest([
+      {
+        targetName: '오지아',
+        amount: '8.8만',
+        date: '2026-05-02',
+        type: 'INCOME',
+        eventType: 'other',
+        customEventName: '돌잔치',
+      },
+    ]));
+
+    expect(response.status).toBe(200);
+    expect(tx.event.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({
+        eventType: 'OTHER',
+        customEventName: '돌잔치',
+      })],
+    }));
+  });
+
   it('skips legacy existing entries whose importFingerprint is null', async () => {
     const tx = makeTx({
       event: {

@@ -43,6 +43,7 @@ interface DepositRow extends DepositCandidate {
   _eventType: EventType;
   _relation: string;
   _customRelation: string;
+  _customEventName: string;
 }
 
 const BACKUP_REQUIRED_HEADERS = ['날짜', '구분', '이름', '금액', '종류'];
@@ -378,6 +379,12 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     )));
   };
 
+  const updateDepositCustomEventName = (key: string, customEventName: string) => {
+    setDepositRows((prev) => prev.map((row) => (
+      row._key === key ? { ...row, _customEventName: customEventName } : row
+    )));
+  };
+
   const toggleAllDepositRows = () => {
     const nextSelected = !allDepositRowsSelected;
     setDepositRows((prev) => prev.map((row) => ({ ...row, _selected: nextSelected })));
@@ -393,6 +400,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       memo: row.memo,
       reason: row.reason,
       eventType: row._eventType,
+      customEventName: row._customEventName,
       relation: row._relation,
       customRelation: row._customRelation,
       selected: row._selected,
@@ -856,19 +864,19 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                           row._selected ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-100 opacity-60'
                         }`}
                       >
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleDepositRow(row._key)}
-                              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                                row._selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
-                              }`}
-                              aria-label={row._selected ? '선택 해제' : '선택'}
-                            >
-                              {row._selected && <Check size={12} className="text-white" />}
-                            </button>
+                        <div className="grid grid-cols-[20px_minmax(0,1fr)] gap-x-3 gap-y-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleDepositRow(row._key)}
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
+                              row._selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
+                            }`}
+                            aria-label={row._selected ? '선택 해제' : '선택'}
+                          >
+                            {row._selected && <Check size={12} className="text-white" />}
+                          </button>
 
+                          <div className="min-w-0 flex items-center gap-2">
                             <input
                               value={row.senderName}
                               onChange={(e) => updateDepositField(row._key, 'senderName', e.target.value)}
@@ -896,15 +904,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                             />
                           </div>
 
-                          <div className="pl-7 space-y-2">
-                            <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-400">
-                              {row.bank && <span>{row.bank}</span>}
-                              {row.memo && <span>· {row.memo}</span>}
-                              {row.reason && <span className="min-w-0 truncate">· {row.reason}</span>}
-                            </div>
-
-                            {row._selected && (
-                              <div className="space-y-1 pt-1">
+                          {row._selected && (
+                            <div className="col-start-2 space-y-1 pt-1">
                                 <div className="grid grid-cols-4 gap-1">
                                   {RELATION_OPTIONS.map(({ value, label }) => {
                                     const active = row._relation === value;
@@ -948,9 +949,16 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                                     );
                                   })}
                                 </div>
-                              </div>
-                            )}
-                          </div>
+                                {row._eventType === 'other' && (
+                                  <input
+                                    value={row._customEventName}
+                                    onChange={(e) => updateDepositCustomEventName(row._key, e.target.value)}
+                                    placeholder="행사 직접 입력"
+                                    className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-100"
+                                  />
+                                )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))

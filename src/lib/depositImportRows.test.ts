@@ -75,6 +75,28 @@ describe('buildDepositBulkEntries', () => {
     }));
   });
 
+  it('uses the custom event name when 기타 event is selected', () => {
+    const result = buildDepositBulkEntries([
+      {
+        senderName: '오지아',
+        amount: 88000,
+        bank: null,
+        date: '2026-05-02',
+        memo: '',
+        reason: '',
+        eventType: 'other',
+        customEventName: '돌잔치',
+        relation: '지인',
+        selected: true,
+      },
+    ], '2026-05-22');
+
+    expect(result[0]).toEqual(expect.objectContaining({
+      eventType: 'other',
+      customEventName: '돌잔치',
+    }));
+  });
+
   it('filters unselected or invalid rows', () => {
     const result = buildDepositBulkEntries([
       {

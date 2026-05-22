@@ -35,6 +35,7 @@ interface BulkEntryInput {
   type?: 'INCOME' | 'EXPENSE';
   memo?: string;
   account?: string;
+  customEventName?: string;
 }
 
 type NormalizedBulkEntry = {
@@ -49,6 +50,7 @@ type NormalizedBulkEntry = {
   type: BulkTransactionType;
   memo: string;
   account: string;
+  customEventName: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -79,14 +81,19 @@ export async function POST(req: NextRequest) {
       date,
       dateKey,
       eventType: normalizeBulkEventType(raw.eventType),
+      customEventName: '',
       location: String(raw.location ?? '').trim() || '기타',
       relation: String(raw.relation ?? '').trim() || '지인',
       type,
       memo: normalizeImportMemo(raw.memo),
       account: String(raw.account ?? ''),
     };
+    const customEventName = entry.eventType === 'OTHER'
+      ? String(raw.customEventName ?? '').trim()
+      : '';
     entries.push({
       ...entry,
+      customEventName,
       importFingerprint: buildBulkDuplicateKey(entry),
     });
   }
@@ -199,6 +206,7 @@ export async function POST(req: NextRequest) {
             relation: entry.relation,
             memo: entry.memo,
             account: entry.account,
+            customEventName: entry.customEventName || null,
             importFingerprint: entry.importFingerprint,
           }],
           skipDuplicates: true,
