@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Papa from 'papaparse';
-import { X, Upload, Check, AlertCircle, Table as TableIcon, Sparkles, Database } from 'lucide-react';
+import { X, Upload, Check, AlertCircle, Table as TableIcon, Sparkles, Database, Image as ImageIcon, FileSpreadsheet, ChevronRight, ArrowLeft, Trash2, Heart, Flower2, Cake, Star } from 'lucide-react';
 import { parseCSVFile, cleanAmount, cleanDate, normalizeEventType, RawCSVData } from '../utils/csvParser';
-import { useStore } from '../store/useStore';
+import { useStore, type EventType } from '../store/useStore';
 import { apiFetch } from '../lib/apiClient';
 import AdPromptDialog from './ads/AdPromptDialog';
 import { toast } from 'sonner';
-import { formatAmountMan } from '../utils/amountFormat';
+import { formatAmountMan, formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { useBackHandler } from '../hooks/useBackHandler';
+import { normalizeImageDataUri } from '../utils/imageDataUri';
 
 interface BackupRow {
   targetName: string;
@@ -22,7 +23,51 @@ interface BackupRow {
   memo: string;
 }
 
+type Confidence = 'high' | 'medium' | 'low';
+
+interface DepositCandidate {
+  senderName: string;
+  amount: number;
+  bank: string | null;
+  date: string | null;
+  memo: string;
+  confidence: Confidence;
+  isLikelyEventRelated: boolean;
+  reason: string;
+}
+
+interface DepositRow extends DepositCandidate {
+  _key: string;
+  _selected: boolean;
+  _eventType: EventType;
+}
+
 const BACKUP_REQUIRED_HEADERS = ['날짜', '구분', '이름', '금액', '종류'];
+
+const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+  { value: 'wedding', label: '결혼', Icon: Heart },
+  { value: 'funeral', label: '부고', Icon: Flower2 },
+  { value: 'birthday', label: '생일', Icon: Cake },
+  { value: 'other', label: '기타', Icon: Star },
+];
+
+type TossPermissionStatus = 'notDetermined' | 'denied' | 'allowed';
+type TossPermissionFunction = {
+  getPermission?: () => Promise<TossPermissionStatus>;
+  openPermissionDialog?: () => Promise<TossPermissionStatus>;
+};
+
+function isAppsInToss(): boolean {
+  return typeof window !== 'undefined' && window.navigator.userAgent.includes('TossApp');
+}
+
+async function ensureTossPermission(fn: TossPermissionFunction): Promise<boolean> {
+  const current = await fn.getPermission?.().catch(() => null);
+  if (!current || current === 'allowed') return true;
+  if (current === 'denied') return false;
+  const next = await fn.openPermissionDialog?.().catch(() => null);
+  return next === 'allowed';
+}
 
 interface Props {
   isOpen: boolean;
@@ -31,7 +76,7 @@ interface Props {
 
 export default function BulkImportModal({ isOpen, onClose }: Props) {
   const { bulkAddEntries, refreshCredits } = useStore();
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [step, setStep] = useState<'upload' | 'fileOptions' | 'mapping' | 'preview' | 'depositReview'>('upload');
   const [csvData, setCsvData] = useState<RawCSVData | null>(null);
   const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
   const [mapping, setMapping] = useState({
@@ -47,10 +92,13 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   const [adPromptOpen, setAdPromptOpen] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'mapping' | 'success' | 'failed'>('idle');
   const [aiReason, setAiReason] = useState<string | null>(null);
-  const [importMode, setImportMode] = useState<'general' | 'backup'>('general');
+  const [importMode, setImportMode] = useState<'general' | 'backup' | 'deposit'>('general');
   const [backupRows, setBackupRows] = useState<BackupRow[] | null>(null);
+  const [depositRows, setDepositRows] = useState<DepositRow[]>([]);
+  const [isAnalyzingDeposit, setIsAnalyzingDeposit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const depositFileInputRef = useRef<HTMLInputElement>(null);
 
   const parseBackupFile = (file: File): Promise<BackupRow[]> =>
     new Promise((resolve, reject) => {
@@ -107,6 +155,91 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '백업 파일을 읽는 중 오류가 발생했습니다.';
       setError(msg);
+    }
+  };
+
+  const analyzeDepositImage = async (imageData: string) => {
+    setError(null);
+    setIsAnalyzingDeposit(true);
+    try {
+      const res = await apiFetch('/api/parse-deposit-image', {
+        method: 'POST',
+        body: JSON.stringify({ image: imageData }),
+      });
+      const json: any = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        const reason = json?.reason;
+        if (reason === 'unauthorized') {
+          setError('로그인이 필요해요.');
+        } else if (reason === 'rate_limit') {
+          setError(json.message || '잠시 후 다시 시도해주세요.');
+        } else {
+          setError(json?.message || '입금내역 화면 분석에 실패했어요.');
+        }
+        return;
+      }
+
+      const parsed: DepositCandidate[] = Array.isArray(json.data) ? json.data : [];
+      if (parsed.length === 0) {
+        setError('입금내역을 찾지 못했어요. 거래 행이 보이는 캡처로 다시 시도해 주세요.');
+        return;
+      }
+
+      const now = Date.now();
+      setDepositRows(parsed.map((row, index) => ({
+        ...row,
+        _key: `${now}-${index}`,
+        _selected: row.isLikelyEventRelated !== false,
+        _eventType: 'other',
+      })));
+      setImportMode('deposit');
+      setStep('depositReview');
+    } catch {
+      setError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsAnalyzingDeposit(false);
+    }
+  };
+
+  const handleDepositFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const imageData = normalizeImageDataUri(reader.result as string | null);
+      if (!imageData) {
+        setError('이미지를 읽지 못했어요. 다시 선택해 주세요.');
+        return;
+      }
+      analyzeDepositImage(imageData);
+    };
+    reader.onerror = () => setError('이미지를 읽지 못했어요. 다시 선택해 주세요.');
+    reader.readAsDataURL(file);
+  };
+
+  const handleDepositImagePick = async () => {
+    if (!isAppsInToss()) {
+      depositFileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const { fetchAlbumPhotos } = await import('@apps-in-toss/web-framework');
+      if (!(await ensureTossPermission(fetchAlbumPhotos))) {
+        toast.error('사진 접근 권한이 필요합니다. 권한을 허용한 뒤 다시 시도해 주세요.');
+        return;
+      }
+      const result = await fetchAlbumPhotos({ maxCount: 1, base64: true, maxWidth: 1280 });
+      const imageData = normalizeImageDataUri(result?.[0]);
+      if (!imageData) {
+        setError('사진을 가져오지 못했어요. 다시 선택해 주세요.');
+        return;
+      }
+      await analyzeDepositImage(imageData);
+    } catch {
+      setError('앨범을 열 수 없습니다. 다시 시도해 주세요.');
     }
   };
 
@@ -203,6 +336,85 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }).filter(Boolean);
   };
 
+  const toggleDepositRow = (key: string) => {
+    setDepositRows((prev) => prev.map((row) => (
+      row._key === key ? { ...row, _selected: !row._selected } : row
+    )));
+  };
+
+  const updateDepositField = (key: string, field: 'senderName' | 'amount' | 'date', value: string) => {
+    setDepositRows((prev) => prev.map((row) => {
+      if (row._key !== key) return row;
+      if (field === 'amount') return { ...row, amount: parseManInputToWon(value) };
+      if (field === 'date') return { ...row, date: value || null };
+      return { ...row, senderName: value };
+    }));
+  };
+
+  const updateDepositEventType = (key: string, eventType: EventType) => {
+    setDepositRows((prev) => prev.map((row) => (
+      row._key === key ? { ...row, _eventType: eventType } : row
+    )));
+  };
+
+  const removeDepositRow = (key: string) => {
+    setDepositRows((prev) => prev.filter((row) => row._key !== key));
+  };
+
+  const handleDepositImport = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const processed = depositRows
+      .filter((row) => row._selected && row.senderName.trim() && row.amount > 0)
+      .map((row) => ({
+        targetName: row.senderName.trim(),
+        amount: row.amount,
+        date: row.date || today,
+        eventType: row._eventType,
+        location: row.bank || '입금내역',
+        relation: '지인',
+        type: 'INCOME' as const,
+        isIncome: true,
+        memo: row.memo || row.reason || '입금내역 화면 가져오기',
+        account: row.bank || '',
+      }));
+
+    if (processed.length === 0) {
+      setError('저장할 항목이 없어요.');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await bulkAddEntries(processed as any);
+      if (result.inserted > 0) {
+        toast.success(`${result.inserted}건을 가져왔어요`, {
+          description: result.skipped > 0
+            ? `총 ${result.attempted}건 중 중복 ${result.skipped}건은 제외했어요.`
+            : `총 ${result.attempted}건을 모두 저장했어요.`,
+        });
+      } else {
+        toast.info('새로 가져올 내역이 없어요', {
+          description: result.skipped > 0
+            ? `총 ${result.attempted}건이 기존 내역 또는 화면 안 중복이었어요.`
+            : undefined,
+        });
+      }
+      setError(null);
+      onClose();
+      reset();
+      return result;
+    } catch (err: any) {
+      if (err?.status === 402 || err?.reason === 'no_credits') {
+        setError(null);
+        setAdPromptOpen(true);
+      } else {
+        setError(err?.message || '가져오기에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleImport = async () => {
     const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
     if (processed.length === 0) {
@@ -259,6 +471,33 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setAiReason(null);
     setImportMode('general');
     setBackupRows(null);
+    setDepositRows([]);
+    setIsAnalyzingDeposit(false);
+  };
+
+  const handleClose = () => {
+    if (isImporting || isAnalyzingDeposit) return;
+    onClose();
+    reset();
+  };
+
+  const handlePrevious = () => {
+    if (isImporting || isAnalyzingDeposit) return;
+    if (step === 'fileOptions') {
+      setStep('upload');
+      return;
+    }
+    if (step === 'mapping') {
+      setStep('fileOptions');
+      return;
+    }
+    if (step === 'preview') {
+      setStep(importMode === 'backup' ? 'fileOptions' : 'mapping');
+      return;
+    }
+    if (step === 'depositReview') {
+      setStep('upload');
+    }
   };
 
   useBackHandler(isOpen, () => {
@@ -267,10 +506,14 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       return true;
     }
 
-    if (isImporting) return true;
+    if (isImporting || isAnalyzingDeposit) return true;
 
-    onClose();
-    reset();
+    if (step !== 'upload') {
+      handlePrevious();
+      return true;
+    }
+
+    handleClose();
     return true;
   });
 
@@ -281,6 +524,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     ? (backupRows ?? []).filter((r) => r.type === 'INCOME').length
     : 0;
   const expenseCount = importMode === 'backup' ? totalCount - incomeCount : 0;
+  const selectedDepositCount = depositRows.filter((row) => row._selected).length;
+  const isBusy = isImporting || isAnalyzingDeposit;
 
   return (
     <AnimatePresence>
@@ -290,7 +535,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={isImporting ? undefined : onClose}
+            onClick={isBusy ? undefined : handleClose}
             className="fixed inset-0 bg-black/40 z-[100] backdrop-blur-sm"
           />
           <motion.div
@@ -300,8 +545,13 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
             className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white rounded-t-[32px] p-6 z-[110] shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">대량 가져오기</h2>
-              <button onClick={onClose} disabled={isImporting} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-30">
+              <div>
+                <h2 className="text-xl font-bold">대량 가져오기</h2>
+                <p className="mt-1 text-xs text-gray-400">
+                  {step === 'depositReview' ? `${depositRows.length}건 인식` : '입금화면과 파일을 한 번에 관리해요'}
+                </p>
+              </div>
+              <button onClick={handleClose} disabled={isBusy} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-30">
                 <X size={20} />
               </button>
             </div>
@@ -315,10 +565,78 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
 
             {step === 'upload' && (
               <div className="space-y-4">
-                {/* 1) 백업 파일 불러오기 — 우리 export 포맷 인식, 받음/보냄 자동 */}
-                <div
+                <button
+                  type="button"
+                  onClick={handleDepositImagePick}
+                  disabled={isAnalyzingDeposit}
+                  className="w-full border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-60 disabled:cursor-wait"
+                >
+                  <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
+                    {isAnalyzingDeposit ? (
+                      <div className="w-[26px] h-[26px] border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <ImageIcon size={26} />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="font-bold text-gray-800">입금내역 화면 가져오기</p>
+                    <p className="text-[11px] text-blue-700 mt-1">
+                      캡처 이미지에서 입금 후보를 AI가 찾아요
+                    </p>
+                  </div>
+                </button>
+                <input
+                  type="file"
+                  ref={depositFileInputRef}
+                  onChange={handleDepositFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setStep('fileOptions')}
+                  className="w-full border border-gray-100 bg-white rounded-3xl p-5 flex items-center gap-4 shadow-sm hover:bg-gray-50 transition-all text-left"
+                >
+                  <div className="p-3 bg-gray-100 text-gray-600 rounded-full">
+                    <FileSpreadsheet size={24} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-800">파일 가져오기</p>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      백업 파일 또는 일반 CSV를 선택해요
+                    </p>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-300" />
+                </button>
+
+                <div className="bg-blue-50 p-4 rounded-2xl text-xs text-blue-700 space-y-1.5">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-blue-500" />
+                    안내
+                  </p>
+                  <p>• 입금화면은 분석 후 저장할 항목을 직접 선택할 수 있어요.</p>
+                  <p>• 저장 시 대량 가져오기 크레딧을 사용합니다.</p>
+                  <p>• 이미 등록된 내역과 중복 행은 자동으로 건너뜁니다.</p>
+                </div>
+              </div>
+            )}
+
+            {step === 'fileOptions' && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handlePrevious}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-gray-500"
+                >
+                  <ArrowLeft size={14} />
+                  <span>이전으로</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => backupFileInputRef.current?.click()}
-                  className="border-2 border-dashed border-emerald-200 bg-emerald-50/30 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer"
+                  className="w-full border-2 border-dashed border-emerald-200 bg-emerald-50/30 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-emerald-400 hover:bg-emerald-50 transition-all"
                 >
                   <div className="p-3 bg-emerald-100 text-emerald-600 rounded-full">
                     <Database size={26} />
@@ -326,22 +644,22 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   <div className="text-center">
                     <p className="font-bold text-gray-700">백업 파일 불러오기</p>
                     <p className="text-[11px] text-emerald-700 mt-1">
-                      마음정산 백업 CSV
+                      마음정산 내보내기로 만든 CSV
                     </p>
                   </div>
-                  <input
-                    type="file"
-                    ref={backupFileInputRef}
-                    onChange={handleBackupFileChange}
-                    accept=".csv,text/csv,text/plain,text/comma-separated-values,application/csv,application/vnd.ms-excel,application/octet-stream,*/*"
-                    className="hidden"
-                  />
-                </div>
+                </button>
+                <input
+                  type="file"
+                  ref={backupFileInputRef}
+                  onChange={handleBackupFileChange}
+                  accept=".csv,text/csv,text/plain,text/comma-separated-values,application/csv,application/vnd.ms-excel,application/octet-stream,*/*"
+                  className="hidden"
+                />
 
-                {/* 2) 일반 CSV 가져오기 — AI 컬럼 매핑 + 사용자 토글 */}
-                <div
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-200 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-blue-400 hover:bg-blue-50 transition-all cursor-pointer"
+                  className="w-full border-2 border-dashed border-gray-200 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-blue-400 hover:bg-blue-50 transition-all"
                 >
                   <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
                     <Upload size={26} />
@@ -349,27 +667,17 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   <div className="text-center">
                     <p className="font-bold text-gray-700">일반 CSV 가져오기</p>
                     <p className="text-[11px] text-gray-400 mt-1">
-                      일반 CSV 파일
+                      첫 번째 행이 제목인 CSV
                     </p>
                   </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".csv,text/csv,text/plain,text/comma-separated-values,application/csv,application/vnd.ms-excel,application/octet-stream,*/*"
-                    className="hidden"
-                  />
-                </div>
-
-                <div className="bg-blue-50 p-4 rounded-2xl text-xs text-blue-700 space-y-1.5">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-blue-500" />
-                    안내
-                  </p>
-                  <p>• 첫 번째 행은 제목(헤더)이어야 해요.</p>
-                  <p>• 백업 파일은 내역 탭의 "내보내기" 로 만든 CSV 예요.</p>
-                  <p>• 이미 등록된 내역과 파일 안 중복 행은 자동으로 건너뜁니다.</p>
-                </div>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".csv,text/csv,text/plain,text/comma-separated-values,application/csv,application/vnd.ms-excel,application/octet-stream,*/*"
+                  className="hidden"
+                />
               </div>
             )}
 
@@ -485,6 +793,157 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
               </div>
             )}
 
+            {step === 'depositReview' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handlePrevious}
+                    disabled={isImporting}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 disabled:opacity-40"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>다시 선택</span>
+                  </button>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full">
+                    선택 {selectedDepositCount}건
+                  </span>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-3 text-xs text-gray-500 leading-relaxed">
+                  경조사와 무관한 입금은 체크를 해제하세요. 저장할 때 대량 가져오기 크레딧이 차감됩니다.
+                </div>
+
+                <div className="space-y-2">
+                  {depositRows.length === 0 ? (
+                    <div className="text-center text-sm text-gray-400 py-8">
+                      모든 항목이 제거되었어요
+                    </div>
+                  ) : (
+                    depositRows.map((row) => (
+                      <div
+                        key={row._key}
+                        className={`p-3 rounded-2xl border transition-all ${
+                          row._selected ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-100 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleDepositRow(row._key)}
+                            className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
+                              row._selected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'
+                            }`}
+                            aria-label={row._selected ? '선택 해제' : '선택'}
+                          >
+                            {row._selected && <Check size={12} className="text-white" />}
+                          </button>
+
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={row.senderName}
+                                onChange={(e) => updateDepositField(row._key, 'senderName', e.target.value)}
+                                className="min-w-0 flex-1 bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-blue-300"
+                                disabled={!row._selected}
+                              />
+                              <ConfidenceBadge level={row.confidence} />
+                              <button
+                                type="button"
+                                onClick={() => removeDepositRow(row._key)}
+                                className="p-1 hover:bg-gray-100 rounded"
+                                aria-label="삭제"
+                              >
+                                <Trash2 size={12} className="text-gray-400" />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center space-x-1">
+                                <input
+                                  value={formatManInputValue(row.amount)}
+                                  onChange={(e) => updateDepositField(row._key, 'amount', e.target.value)}
+                                  inputMode="decimal"
+                                  className="w-24 bg-transparent font-bold text-blue-600 text-sm outline-none border-b border-transparent focus:border-blue-300 text-right"
+                                  disabled={!row._selected}
+                                />
+                                <span className="text-xs text-blue-600 font-bold">만</span>
+                              </div>
+                              <input
+                                type="date"
+                                value={row.date || ''}
+                                onChange={(e) => updateDepositField(row._key, 'date', e.target.value)}
+                                className="min-w-0 w-[128px] bg-gray-50 rounded-lg px-2 py-1.5 text-[11px] text-gray-500 outline-none focus:ring-2 focus:ring-blue-100"
+                                disabled={!row._selected}
+                              />
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1 text-[11px] text-gray-400">
+                              {row.bank && <span>{row.bank}</span>}
+                              {row.memo && <span>· {row.memo}</span>}
+                              {!row.isLikelyEventRelated && (
+                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-bold text-amber-600">
+                                  제외 추천
+                                </span>
+                              )}
+                              {row.reason && <span className="min-w-0 truncate">· {row.reason}</span>}
+                            </div>
+
+                            {row._selected && (
+                              <div className="grid grid-cols-4 gap-1 pt-1">
+                                {EVENT_OPTIONS.map(({ value, label, Icon }) => {
+                                  const active = row._eventType === value;
+                                  return (
+                                    <button
+                                      key={value}
+                                      type="button"
+                                      onClick={() => updateDepositEventType(row._key, value)}
+                                      className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                                        active
+                                          ? 'bg-blue-600 text-white shadow-sm'
+                                          : 'bg-gray-50 text-gray-500 border border-gray-100'
+                                      }`}
+                                    >
+                                      <Icon size={11} className={active ? 'text-white' : 'text-gray-400'} />
+                                      <span>{label}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    onClick={handlePrevious}
+                    disabled={isImporting}
+                    className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    이전으로
+                  </button>
+                  <button
+                    onClick={handleDepositImport}
+                    disabled={isImporting || selectedDepositCount === 0}
+                    className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isImporting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>등록 중...</span>
+                      </>
+                    ) : (
+                      <span>선택 저장 ({selectedDepositCount}건)</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {step === 'preview' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -548,7 +1007,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => setStep(importMode === 'backup' ? 'upload' : 'mapping')}
+                    onClick={handlePrevious}
                     disabled={isImporting}
                     className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold active:scale-95 transition-all disabled:opacity-40"
                   >
@@ -580,6 +1039,20 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+function ConfidenceBadge({ level }: { level: Confidence }) {
+  const styles: Record<Confidence, string> = {
+    high: 'bg-blue-50 text-blue-600',
+    medium: 'bg-gray-100 text-gray-500',
+    low: 'bg-amber-50 text-amber-600',
+  };
+  const labels: Record<Confidence, string> = { high: '확실', medium: '보통', low: '불확실' };
+  return (
+    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${styles[level]}`}>
+      {labels[level]}
+    </span>
   );
 }
 
