@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider as TdsThemeProvider } from "@toss/tds-mobile";
 import { useStore } from "@/src/store/useStore";
 import Onboarding from "@/src/components/Onboarding";
+import { OnboardingTourProvider } from "@/src/components/onboarding/OnboardingTourContext";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
 
 const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
@@ -50,7 +51,7 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   const showOnboarding = !tossUserId && !SKIP_ONBOARDING_PATHS.includes(pathname);
 
   return (
-    <>
+    <OnboardingTourProvider enabled={showOnboarding}>
       {children}
       {showOnboarding && (
         <Onboarding onComplete={handleOnboardingComplete} />
@@ -84,7 +85,7 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
           },
         }}
       />
-    </>
+    </OnboardingTourProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore, type EventEntry } from '../store/useStore';
 import { Search, Trash2, Heart, Flower2, Cake, Star, FileSpreadsheet, Upload, CheckSquare, Square, StickyNote } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import BulkImportModal from '../components/BulkImportModal';
 import ContactDetail from '../components/ContactDetail';
 import EntryEditSheet from '../components/EntryEditSheet';
+import { useOnboardingTour } from '../components/onboarding/OnboardingTourContext';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { exportToCsv } from '../utils/csvExport';
 import { formatAmountMan } from '../utils/amountFormat';
@@ -25,6 +26,7 @@ const safeDate = (d: string) => {
 
 export default function HistoryTab() {
   const { entries, removeEntry, contacts } = useStore();
+  const tour = useOnboardingTour();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'given' | 'received'>('all');
   const [importOpen, setImportOpen] = useState(false);
@@ -36,6 +38,29 @@ export default function HistoryTab() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const tourToday = format(new Date(), 'yyyy-MM-dd');
+  const tourSavedEntries = useMemo<EventEntry[]>(() => ([
+    {
+      id: 'tour-expense-1',
+      contactId: '',
+      eventType: 'wedding',
+      type: 'EXPENSE',
+      date: tourToday,
+      location: '라움아트센터',
+      targetName: '김민지',
+      account: '',
+      amount: 100000,
+      relation: '친구',
+      recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
+      memo: '체험용 샘플',
+      isIncome: false,
+      createdAt: Date.now(),
+      userId: 'tour',
+    },
+  ]), [tourToday]);
+  const displayEntries = tour.isActive && tour.step >= 6
+    ? tourSavedEntries
+    : entries;
 
   const handleExport = async () => {
     if (isExporting) return;
@@ -70,6 +95,14 @@ export default function HistoryTab() {
     setDeleteTarget(null);
   };
 
+  const handleImportClick = () => {
+    if (tour.handleTargetAction('import')) {
+      setImportOpen(true);
+      return;
+    }
+    setImportOpen(true);
+  };
+
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -92,7 +125,7 @@ export default function HistoryTab() {
     });
   };
 
-  const filtered = entries.filter(e => {
+  const filtered = displayEntries.filter(e => {
     const s = search.toLowerCase().trim();
     const eventLabelText = eventLabel(e.eventType, e.customEventName);
     // 부고는 '장례'로도 검색되도록 동의어 처리
@@ -165,13 +198,13 @@ export default function HistoryTab() {
         <div className="flex items-center justify-between gap-2 max-[360px]:gap-1.5">
           <div className="min-w-0">
             <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight max-[360px]:text-[20px]">전체 내역</h1>
-            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400 max-[360px]:text-[11px]">{entries.length}건의 기록</p>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400 max-[360px]:text-[11px]">{displayEntries.length}건의 기록</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 max-[420px]:gap-1">
             <button
               type="button"
               onClick={toggleSelectionMode}
-              disabled={entries.length === 0 || isDeleting}
+              disabled={displayEntries.length === 0 || isDeleting}
               aria-label={selectionMode ? '선택 취소' : '내역 선택'}
               className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-colors active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0 ${
                 selectionMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -192,8 +225,9 @@ export default function HistoryTab() {
             </button>
             <button
               type="button"
-              onClick={() => setImportOpen(true)}
+              onClick={handleImportClick}
               disabled={selectionMode}
+              data-tour-target="history-import-button"
               aria-label="가져오기"
               className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-blue-600 transition-colors hover:bg-blue-100 active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px]"
             >
@@ -254,6 +288,7 @@ export default function HistoryTab() {
             <div
               key={e.id}
               onClick={() => selectionMode ? toggleEntrySelection(e.id) : setEditTarget({ ...e })}
+              data-tour-target={tour.isActive && e.id === 'tour-expense-1' ? 'history-saved-entry' : undefined}
               className={`grid items-center gap-3 bg-white p-4 rounded-2xl border group relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all max-[360px]:gap-2 max-[360px]:p-3.5 ${
                 selectionMode ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
               } ${
@@ -380,6 +415,7 @@ export default function HistoryTab() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

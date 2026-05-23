@@ -85,7 +85,10 @@ export default function Layout({ children, activeTab }: { children: React.ReactN
     <div className="min-h-screen bg-zinc-900 flex items-center justify-center md:py-6">
 
 
-      <div className="w-full max-w-[430px] h-screen md:h-[880px] bg-gray-50 md:rounded-[44px] md:border-[7px] md:border-zinc-800 md:shadow-2xl relative overflow-hidden overflow-x-hidden flex flex-col">
+      <div
+        data-tour-frame="app"
+        className="w-full max-w-[430px] h-screen md:h-[880px] bg-gray-50 md:rounded-[44px] md:border-[7px] md:border-zinc-800 md:shadow-2xl relative overflow-hidden overflow-x-hidden flex flex-col"
+      >
         <main className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar">
           <motion.div
             key={activeTab}

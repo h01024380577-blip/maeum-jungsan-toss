@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import EntryEditSheet from '../components/EntryEditSheet';
 import { useBackHandler } from '../hooks/useBackHandler';
+import { useOnboardingTour } from '../components/onboarding/OnboardingTourContext';
 import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { openExternalUrl } from '../lib/openExternalUrl';
@@ -182,6 +183,7 @@ function isLikelyUrl(value: string) {
 
 export default function HomeTab() {
   const router = useRouter();
+  const tour = useOnboardingTour();
   const handleTossLogin = () => {
     router.push('/intro');
   };
@@ -225,8 +227,76 @@ export default function HomeTab() {
     return true;
   });
 
+  useEffect(() => {
+    if (!tour.isActive) return;
+    const targetByStep: Record<number, string> = {
+      2: 'input-card',
+      3: 'result-info',
+      4: 'amount-card',
+    };
+    const targetId = targetByStep[tour.step];
+    if (!targetId) return;
+
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector(`[data-tour-target="${targetId}"]`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [tour.isActive, tour.step]);
+
   const now = new Date();
-  const monthEntries = entries.filter((entry) => {
+  const tourToday = format(now, 'yyyy-MM-dd');
+  const tourResultData = useMemo<Partial<EventEntry>>(() => ({
+    id: 'tour-result',
+    contactId: '',
+    eventType: 'wedding',
+    type: 'EXPENSE',
+    date: tourToday,
+    location: '라움아트센터',
+    targetName: '김민지',
+    account: '토스뱅크 1000-1234-5678 김민지',
+    amount: 100000,
+    relation: '친구',
+    recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
+    memo: '체험용 샘플',
+    isIncome: false,
+    createdAt: now.getTime(),
+    userId: 'tour',
+  }), [now, tourToday]);
+  const tourSavedEntries = useMemo<EventEntry[]>(() => ([
+    {
+      id: 'tour-expense-1',
+      contactId: '',
+      eventType: 'wedding',
+      type: 'EXPENSE',
+      date: tourToday,
+      location: '라움아트센터',
+      targetName: '김민지',
+      account: '',
+      amount: 100000,
+      relation: '친구',
+      recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
+      memo: '체험용 샘플',
+      isIncome: false,
+      createdAt: now.getTime(),
+      userId: 'tour',
+    },
+  ]), [now, tourToday]);
+
+  useEffect(() => {
+    if (!tour.isActive || !tour.isStep(5)) return;
+    setSavedAccount(tourResultData.account || '');
+    setShowTransferModal(true);
+
+    return () => setShowTransferModal(false);
+  }, [tour, tourResultData.account]);
+
+  const displayEntries = tour.isActive && tour.step >= 5
+    ? tourSavedEntries
+    : entries;
+  const monthEntries = displayEntries.filter((entry) => {
     try {
       const date = parseISO(entry.date);
       return !isNaN(date.getTime()) && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
@@ -428,10 +498,12 @@ export default function HomeTab() {
     }
   };
 
-  const recentEntries = entries.slice(0, 3);
+  const recentEntries = displayEntries.slice(0, 3);
   const activeInputValue = inputMode === 'url' ? inputUrl : inputText;
+  const tourSampleUrl = 'https://wedding.example.com/minji-junho';
+  const displayInputValue = tour.isActive && tour.isStep(2) ? tourSampleUrl : activeInputValue;
   const greetingName = tossUserName?.trim() ? `${tossUserName.trim().replace(/님$/, '')}님` : '손님';
-  const canAnalyzeInput = activeInputValue.trim().length > 0 && !isParsing;
+  const canAnalyzeInput = (tour.isActive && tour.isStep(2)) || (activeInputValue.trim().length > 0 && !isParsing);
   const handleUrlMode = () => {
     if (inputMode === 'url') {
       setInputMode('text');
@@ -443,13 +515,54 @@ export default function HomeTab() {
     setSelectedImage(null);
   };
   const handlePrimaryAnalyze = () => {
+    if (tour.handleTargetAction('analyze')) return;
     const data = activeInputValue.trim();
     if (!data) return;
     handleParse({ type: inputMode === 'url' ? 'url' : 'text', data });
   };
+  const isTourResultSheet = tour.isActive && tour.isStep(3, 4);
+  const visibleParsedData = isTourResultSheet ? tourResultData : parsedData;
+  const visibleInitialParsedData = isTourResultSheet ? tourResultData : initialParsedData;
+  const showReviewSheet = showBottomSheet || isTourResultSheet;
+  const updateVisibleParsedData = (nextData: Partial<EventEntry>) => {
+    if (isTourResultSheet) return;
+    setParsedData(nextData);
+  };
+  const handleReviewClose = () => {
+    if (isTourResultSheet) return;
+    setShowBottomSheet(false);
+  };
+  const handleReviewSave = () => {
+    if (!visibleParsedData) return;
+    if (tour.handleTargetAction('save')) return;
+    handleSave(visibleParsedData);
+  };
+  const handleTransferClick = async () => {
+    if (tour.handleTargetAction('history')) {
+      setShowTransferModal(false);
+      router.push('/history');
+      return;
+    }
+
+    try {
+      await copyToClipboard(savedAccount);
+      toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
+      setShowTransferModal(false);
+      setTimeout(async () => {
+        // 토스 앱 송금 화면으로 이동
+        try {
+          await openExternalUrl('supertoss://send');
+        } catch {
+          // 스킴 열기 실패 시 무시 (계좌번호는 이미 복사됨)
+        }
+      }, 300);
+    } catch {
+      toast.error('토스 앱을 열 수 없습니다.', { duration: 3000, icon: <AlertCircle size={16} /> });
+    }
+  };
 
   return (
-    <div className="pb-5">
+    <div className="pb-5" data-tour-target="home-shell">
       <div className="px-5 pt-8 pb-3 max-[360px]:px-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -486,7 +599,7 @@ export default function HomeTab() {
           </p>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm max-[360px]:p-3">
+        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm max-[360px]:p-3" data-tour-target="input-card">
           {selectedImage ? (
             <div className="flex min-h-[64px] items-center gap-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse">
@@ -505,7 +618,7 @@ export default function HomeTab() {
             </div>
           ) : (
             <textarea
-              value={activeInputValue}
+              value={displayInputValue}
               onChange={(event) => {
                 if (inputMode === 'url') setInputUrl(event.target.value);
                 else setInputText(event.target.value);
@@ -557,6 +670,7 @@ export default function HomeTab() {
               type="button"
               onClick={handlePrimaryAnalyze}
               disabled={!canAnalyzeInput}
+              data-tour-target="ai-analyze-button"
               className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 max-[360px]:ml-0 ${
                 canAnalyzeInput ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-gray-200 text-gray-400'
               }`}
@@ -570,7 +684,7 @@ export default function HomeTab() {
 
       </div>
 
-      <div className="space-y-6 px-5 max-[360px]:space-y-5 max-[360px]:px-4">
+      <div className="space-y-6 px-5 max-[360px]:space-y-5 max-[360px]:px-4" data-tour-target="home-reflected">
         <section>
           <div className="mb-2.5 flex items-center justify-between">
             <h3 className="text-[14px] font-black text-gray-800">
@@ -644,9 +758,9 @@ export default function HomeTab() {
 
       {/* Bottom Sheet */}
       <AnimatePresence>
-        {showBottomSheet && parsedData && (
+        {showReviewSheet && visibleParsedData && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowBottomSheet(false)} className="fixed inset-0 bg-black/40 z-[60]" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReviewClose} className="fixed inset-0 bg-black/40 z-[60]" />
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 z-[70] flex max-h-[94dvh] w-full max-w-[430px] -translate-x-1/2 flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
               <div className="shrink-0 border-b border-gray-100 bg-white px-5 pb-3 pt-2 max-[360px]:px-4">
                 <div className="w-14 h-1 bg-gray-300 rounded-full mx-auto mb-3.5" />
@@ -654,15 +768,15 @@ export default function HomeTab() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 text-xs font-black text-blue-600">
                       <Sparkles size={12} />
-                      <span>{initialParsedData ? 'AI 분석 완료' : '직접 입력'}</span>
+                      <span>{visibleInitialParsedData ? 'AI 분석 완료' : '직접 입력'}</span>
                     </div>
                     <h3 className="mt-1.5 break-keep text-[20px] leading-tight font-black text-gray-950 max-[360px]:text-[18px]">
-                      {initialParsedData ? '내용을 확인해주세요' : '내용을 입력해주세요'}
+                      {visibleInitialParsedData ? '내용을 확인해주세요' : '내용을 입력해주세요'}
                     </h3>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowBottomSheet(false)}
+                    onClick={handleReviewClose}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-all"
                     aria-label="닫기"
                   >
@@ -673,74 +787,78 @@ export default function HomeTab() {
 
               <div className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden bg-white px-3 py-2.5 no-scrollbar max-[360px]:px-2.5">
                 <DirectionToggle
-                  value={parsedData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
-                  onChange={(nextType) => setParsedData({...parsedData, type: nextType, isIncome: nextType === 'INCOME'})}
+                  value={visibleParsedData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
+                  onChange={(nextType) => updateVisibleParsedData({...visibleParsedData, type: nextType, isIncome: nextType === 'INCOME'})}
                 />
 
-                <Field
-                  label="이름"
-                  type="contact"
-                  value={parsedData.targetName}
-                  ai={!!initialParsedData?.targetName}
-                  tone={initialParsedData?.targetName ? 'blue' : 'gray'}
-                  onChange={(v: string, cid?: string) => setParsedData({...parsedData, targetName: v, contactId: cid})}
-                  contacts={contacts}
-                  suggestedNames={(parsedData as any).suggestedNames || []}
-                />
-
-                <ReviewDateField
-                  label="날짜"
-                  value={parsedData.date}
-                  ai={!!initialParsedData?.date}
-                  onChange={(v: string) => setParsedData({...parsedData, date: v})}
-                />
-
-                <EventTypeSelector
-                  value={(parsedData.eventType || 'other') as EventType}
-                  ai={!!initialParsedData?.eventType}
-                  initialValue={initialParsedData?.eventType as EventType | undefined}
-                  onChange={(v: EventType) => setParsedData({...parsedData, eventType: v})}
-                />
-
-                {parsedData.eventType === 'other' && (
+                <div data-tour-target="result-info" className="space-y-2">
                   <Field
-                    label="행사명"
-                    placeholder="돌잔치, 개업식 등"
-                    value={parsedData.customEventName}
-                    ai={!!initialParsedData?.customEventName}
-                    tone={initialParsedData?.customEventName ? 'blue' : 'gray'}
-                    onChange={(v: string) => setParsedData({...parsedData, customEventName: v})}
+                    label="이름"
+                    type="contact"
+                    value={visibleParsedData.targetName}
+                    ai={!!visibleInitialParsedData?.targetName}
+                    tone={visibleInitialParsedData?.targetName ? 'blue' : 'gray'}
+                    onChange={(v: string, cid?: string) => updateVisibleParsedData({...visibleParsedData, targetName: v, contactId: cid})}
+                    contacts={contacts}
+                    suggestedNames={(visibleParsedData as any).suggestedNames || []}
                   />
-                )}
 
-                <Field
-                  label="장소"
-                  value={parsedData.location}
-                  ai={!!initialParsedData?.location}
-                  tone={initialParsedData?.location ? 'blue' : 'gray'}
-                  fitToWidth
-                  minFitFontSize={12}
-                  maxFitFontSize={14}
-                  onChange={(v: string) => setParsedData({...parsedData, location: v})}
-                />
+                  <ReviewDateField
+                    label="날짜"
+                    value={visibleParsedData.date}
+                    ai={!!visibleInitialParsedData?.date}
+                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, date: v})}
+                  />
 
-                <Field
-                  label="관계"
-                  value={parsedData.relation}
-                  onChange={(v: string) => setParsedData({...parsedData, relation: v})}
-                />
+                  <EventTypeSelector
+                    value={(visibleParsedData.eventType || 'other') as EventType}
+                    ai={!!visibleInitialParsedData?.eventType}
+                    initialValue={visibleInitialParsedData?.eventType as EventType | undefined}
+                    onChange={(v: EventType) => updateVisibleParsedData({...visibleParsedData, eventType: v})}
+                  />
 
-                <AmountReviewCard
-                  amount={parsedData.amount}
-                  reason={parsedData.recommendationReason}
-                  onChange={(amount: number) => setParsedData({...parsedData, amount})}
-                />
+                  {visibleParsedData.eventType === 'other' && (
+                    <Field
+                      label="행사명"
+                      placeholder="돌잔치, 개업식 등"
+                      value={visibleParsedData.customEventName}
+                      ai={!!visibleInitialParsedData?.customEventName}
+                      tone={visibleInitialParsedData?.customEventName ? 'blue' : 'gray'}
+                      onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, customEventName: v})}
+                    />
+                  )}
+
+                  <Field
+                    label="장소"
+                    value={visibleParsedData.location}
+                    ai={!!visibleInitialParsedData?.location}
+                    tone={visibleInitialParsedData?.location ? 'blue' : 'gray'}
+                    fitToWidth
+                    minFitFontSize={12}
+                    maxFitFontSize={14}
+                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, location: v})}
+                  />
+
+                  <Field
+                    label="관계"
+                    value={visibleParsedData.relation}
+                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, relation: v})}
+                  />
+                </div>
+
+                <div data-tour-target="amount-card">
+                  <AmountReviewCard
+                    amount={visibleParsedData.amount}
+                    reason={visibleParsedData.recommendationReason}
+                    onChange={(amount: number) => updateVisibleParsedData({...visibleParsedData, amount})}
+                  />
+                </div>
 
                 <AccountReviewCard
-                  account={parsedData.account || ''}
-                  ai={!!initialParsedData?.account}
-                  suggestedAccounts={(parsedData as any).suggestedAccounts || []}
-                  onChange={(account: string) => setParsedData({...parsedData, account})}
+                  account={visibleParsedData.account || ''}
+                  ai={!!visibleInitialParsedData?.account}
+                  suggestedAccounts={(visibleParsedData as any).suggestedAccounts || []}
+                  onChange={(account: string) => updateVisibleParsedData({...visibleParsedData, account})}
                   onCopy={async (account: string) => {
                     try {
                       await copyToClipboard(account);
@@ -755,8 +873,8 @@ export default function HomeTab() {
                   label="메모"
                   type="textarea"
                   placeholder="필요한 내용만 적어두세요"
-                  value={parsedData.memo || ''}
-                  onChange={(v: string) => setParsedData({...parsedData, memo: v})}
+                  value={visibleParsedData.memo || ''}
+                  onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, memo: v})}
                 />
               </div>
 
@@ -764,16 +882,16 @@ export default function HomeTab() {
                 <div className="flex gap-2.5">
                   <button
                     type="button"
-                    onClick={() => setShowBottomSheet(false)}
+                    onClick={handleReviewClose}
                     className="h-12 w-20 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 active:scale-[0.98] transition-all max-[360px]:w-16"
                   >
                     취소
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSave(parsedData)}
-                    disabled={!parsedData.targetName?.trim()}
-                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all max-[360px]:text-[15px] ${!parsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
+                    onClick={handleReviewSave}
+                    disabled={!visibleParsedData.targetName?.trim()}
+                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all max-[360px]:text-[15px] ${!visibleParsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
                   >
                     저장하기
                   </button>
@@ -865,23 +983,12 @@ export default function HomeTab() {
                   <button onClick={() => setShowTransferModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm active:scale-95 transition-all">
                     닫기
                   </button>
-                  <button onClick={async () => {
-                    try {
-                      await copyToClipboard(savedAccount);
-                      toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
-                      setShowTransferModal(false);
-                      setTimeout(async () => {
-                        // 토스 앱 송금 화면으로 이동
-                        try {
-                          await openExternalUrl('supertoss://send');
-                        } catch {
-                          // 스킴 열기 실패 시 무시 (계좌번호는 이미 복사됨)
-                        }
-                      }, 300);
-                    } catch {
-                      toast.error('토스 앱을 열 수 없습니다.', { duration: 3000, icon: <AlertCircle size={16} /> });
-                    }
-                  }} className="flex-[2] py-3.5 bg-blue-500 text-white rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-blue-200">
+                  <button
+                    type="button"
+                    onClick={handleTransferClick}
+                    data-tour-target="toss-transfer-button"
+                    className="flex-[2] py-3.5 bg-blue-500 text-white rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-blue-200"
+                  >
                     토스로 송금하기
                   </button>
                 </div>

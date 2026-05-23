@@ -1,73 +1,264 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
-import { MessageSquareText, Sparkles, BarChart3, Heart } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useStore } from "@/src/store/useStore";
-import { tossLogin } from "@/src/lib/tossAuth";
-import { apiFetch, setAuthToken } from "@/src/lib/apiClient";
-import { toast } from "sonner";
-
-const SLIDES = [
-  {
-    icon: MessageSquareText,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-500",
-    headline: "경조사비, 아직도\n메모장에 적고 계세요?",
-    description:
-      "누가, 언제, 얼마를 줬는지 헷갈리지 않도록\n마음정산이 도와드릴게요",
-  },
-  {
-    icon: Sparkles,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-500",
-    headline: "청첩장 링크 하나로\n자동 입력",
-    description:
-      "AI가 URL·이미지를 분석해서 이름, 날짜,\n장소, 계좌번호까지 자동으로 채워줘요",
-  },
-  {
-    icon: BarChart3,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-500",
-    headline: "관계별 통계로\n한눈에 정리",
-    description:
-      "누구에게 얼마를 주고받았는지\n연락처별로 깔끔하게 관리돼요",
-  },
-  {
-    icon: Heart,
-    iconBg: "bg-rose-50",
-    iconColor: "text-rose-500",
-    headline: "지금 바로\n시작해보세요",
-    description: "토스 계정으로 3초 만에 시작할 수 있어요",
-  },
-] as const;
-
-const TOTAL = SLIDES.length;
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { useStore } from '@/src/store/useStore';
+import { apiFetch, setAuthToken } from '@/src/lib/apiClient';
+import { tossLogin } from '@/src/lib/tossAuth';
+import { useOnboardingTour } from '@/src/components/onboarding/OnboardingTourContext';
+import { ONBOARDING_TOTAL_STEPS } from '@/src/components/onboarding/onboardingTour';
 
 interface OnboardingProps {
   onComplete: () => void;
 }
 
-export default function Onboarding({ onComplete }: OnboardingProps) {
-  const { loadFromSupabase } = useStore();
-  const [current, setCurrent] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const [isLogging, setIsLogging] = useState(false);
+interface TourRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
 
-  const goTo = useCallback(
-    (next: number) => {
-      if (next < 0 || next >= TOTAL) return;
-      setDirection(next > current ? 1 : -1);
-      setCurrent(next);
-    },
-    [current],
+interface TourBounds {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function expandRect(rect: TourRect, padding: number): TourRect {
+  return {
+    top: Math.max(0, rect.top - padding),
+    left: Math.max(0, rect.left - padding),
+    width: rect.width + padding * 2,
+    height: rect.height + padding * 2,
+  };
+}
+
+function readTargetRect(targetId?: string): TourRect | null {
+  if (!targetId || typeof document === 'undefined') return null;
+  const target = document.querySelector<HTMLElement>(`[data-tour-target="${targetId}"]`);
+  if (!target) return null;
+  const rect = target.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  return {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function readTourBounds(): TourBounds {
+  if (typeof window === 'undefined') {
+    return { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
+  }
+
+  const frame = document.querySelector<HTMLElement>('[data-tour-frame="app"]');
+  const frameRect = frame?.getBoundingClientRect();
+  if (frameRect && frameRect.width > 0 && frameRect.height > 0) {
+    return {
+      top: frameRect.top,
+      left: frameRect.left,
+      right: frameRect.right,
+      bottom: frameRect.bottom,
+      width: frameRect.width,
+      height: frameRect.height,
+    };
+  }
+
+  return {
+    top: 0,
+    left: 0,
+    right: window.innerWidth,
+    bottom: window.innerHeight,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function useTourRect(targetId?: string, isActive = false) {
+  const [rect, setRect] = useState<TourRect | null>(null);
+
+  const measure = useCallback(() => {
+    setRect(readTargetRect(targetId));
+  }, [targetId]);
+
+  useEffect(() => {
+    if (!isActive) {
+      setRect(null);
+      return;
+    }
+
+    measure();
+    const frame = window.requestAnimationFrame(measure);
+    const interval = window.setInterval(measure, 450);
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [isActive, measure]);
+
+  return rect;
+}
+
+function SpotlightScrim({ rect }: { rect: TourRect | null }) {
+  if (!rect) {
+    return <div className="pointer-events-auto absolute inset-0 bg-black/50 backdrop-blur-[1px]" />;
+  }
+
+  const hole = expandRect(rect, 8);
+  const bottom = hole.top + hole.height;
+  const right = hole.left + hole.width;
+
+  return (
+    <>
+      <div className="pointer-events-auto fixed left-0 top-0 w-full bg-black/50 backdrop-blur-[1px]" style={{ height: hole.top }} />
+      <div className="pointer-events-auto fixed left-0 bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, width: hole.left, height: hole.height }} />
+      <div className="pointer-events-auto fixed right-0 bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: right, height: hole.height }} />
+      <div className="pointer-events-auto fixed bottom-0 left-0 w-full bg-black/50 backdrop-blur-[1px]" style={{ top: bottom }} />
+    </>
+  );
+}
+
+function PulseRing({ rect }: { rect: TourRect | null }) {
+  if (!rect) return null;
+  const ring = expandRect(rect, 6);
+
+  return (
+    <div
+      className="pointer-events-none fixed rounded-[18px] border-2 border-blue-400 shadow-[0_0_0_6px_rgba(49,130,246,0.18)]"
+      style={{
+        top: ring.top,
+        left: ring.left,
+        width: ring.width,
+        height: ring.height,
+      }}
+    />
+  );
+}
+
+function getTooltipStyle(
+  rect: TourRect | null,
+  placement: 'top' | 'bottom' | 'center' = 'bottom',
+  measuredHeight = 0,
+): CSSProperties {
+  if (typeof window === 'undefined') {
+    return {
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+    };
+  }
+
+  const bounds = readTourBounds();
+  const margin = 16;
+  const gap = 14;
+  const minTooltipHeight = 160;
+  const estimatedCenterHeight = 224;
+  const centerHeight = measuredHeight > 0 ? measuredHeight : estimatedCenterHeight;
+  const width = Math.max(240, Math.min(316, bounds.width - margin * 2));
+  const minLeft = bounds.left + margin;
+  const maxLeft = Math.max(minLeft, bounds.right - width - margin);
+
+  if (placement === 'center' || !rect) {
+    const left = clamp(bounds.left + bounds.width / 2 - width / 2, minLeft, maxLeft);
+    const minTop = bounds.top + margin;
+    const maxTop = Math.max(minTop, bounds.bottom - centerHeight - margin);
+    const top = clamp(bounds.top + bounds.height / 2 - centerHeight / 2, minTop, maxTop);
+    return { left, top, width };
+  }
+
+  const left = clamp(rect.left + rect.width / 2 - width / 2, minLeft, maxLeft);
+  const placeAbove = (): CSSProperties => {
+    const targetTop = Math.max(bounds.top + margin + gap, rect.top);
+    const availableHeight = Math.max(minTooltipHeight, targetTop - bounds.top - margin - gap);
+    return {
+      left,
+      bottom: Math.max(0, window.innerHeight - targetTop + gap),
+      width,
+      maxHeight: availableHeight,
+      overflowY: 'auto',
+    };
+  };
+  const placeBelow = (): CSSProperties => {
+    const top = rect.top + rect.height + gap;
+    const maxTop = Math.max(bounds.top + margin, bounds.bottom - minTooltipHeight - margin);
+    const safeTop = clamp(top, bounds.top + margin, maxTop);
+    return {
+      left,
+      top: safeTop,
+      width,
+      maxHeight: Math.max(minTooltipHeight, bounds.bottom - safeTop - margin),
+      overflowY: 'auto',
+    };
+  };
+
+  if (placement === 'top') {
+    const availableAbove = rect.top - bounds.top - margin - gap;
+    return availableAbove >= minTooltipHeight ? placeAbove() : placeBelow();
+  }
+
+  const availableBelow = bounds.bottom - (rect.top + rect.height + gap) - margin;
+  return availableBelow >= minTooltipHeight ? placeBelow() : placeAbove();
+}
+
+export default function Onboarding({ onComplete }: OnboardingProps) {
+  const router = useRouter();
+  const { loadFromSupabase } = useStore();
+  const tour = useOnboardingTour();
+  const [isLogging, setIsLogging] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [tooltipHeight, setTooltipHeight] = useState(0);
+
+  const targetRect = useTourRect(tour.currentStep.targetId, tour.isActive);
+  const pulseRect = useTourRect(tour.currentStep.pulseTargetId || tour.currentStep.targetId, tour.isActive);
+
+  const tooltipStyle = useMemo(
+    () => getTooltipStyle(targetRect, tour.currentStep.placement, tooltipHeight),
+    [targetRect, tour.currentStep.placement, tooltipHeight],
   );
 
-  const handleNext = useCallback(() => {
-    if (current < TOTAL - 1) goTo(current + 1);
-  }, [current, goTo]);
+  useEffect(() => {
+    if (!tour.isActive) {
+      setTooltipHeight(0);
+      return;
+    }
 
-  const handleLogin = async () => {
+    const node = tooltipRef.current;
+    if (!node) return;
+
+    const measure = () => {
+      const nextHeight = node.getBoundingClientRect().height;
+      if (nextHeight > 0) setTooltipHeight(nextHeight);
+    };
+
+    measure();
+    const frame = window.requestAnimationFrame(measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [tour.isActive, tour.step]);
+
+  const handleLogin = useCallback(async () => {
     setIsLogging(true);
     try {
       const result = await tossLogin();
@@ -75,133 +266,98 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         toast.error('토스 로그인이 취소되었습니다.');
         return;
       }
+
       const res = await apiFetch('/api/auth/toss', {
         method: 'POST',
         body: JSON.stringify(result),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.token) setAuthToken(data.token);
-        localStorage.setItem('heartbook-onboarding-seen', 'true');
-        await loadFromSupabase();
-        onComplete();
-      } else {
+
+      if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         toast.error(err.message || err.error || `로그인 실패 (${res.status})`);
+        return;
       }
+
+      const data = await res.json();
+      if (data.token) setAuthToken(data.token);
+      localStorage.setItem('heartbook-onboarding-seen', 'true');
+      await loadFromSupabase();
+      tour.finish();
+      onComplete();
+      router.replace('/');
     } catch (e) {
       console.error('[Onboarding] login error:', e);
       toast.error('로그인 중 오류가 발생했습니다.');
     } finally {
       setIsLogging(false);
     }
-  };
+  }, [loadFromSupabase, onComplete, router, tour]);
 
-  const handleDragEnd = useCallback(
-    (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
-      const threshold = 50;
-      if (info.offset.x < -threshold || info.velocity.x < -500) {
-        if (current < TOTAL - 1) goTo(current + 1);
-      } else if (info.offset.x > threshold || info.velocity.x > 500) {
-        if (current > 0) goTo(current - 1);
-      }
-    },
-    [current, goTo],
-  );
+  const handleNext = useCallback(() => {
+    if (tour.currentStep.action === 'history') {
+      tour.next();
+      router.push('/history');
+      return;
+    }
 
-  const slide = SLIDES[current];
-  const Icon = slide.icon;
-  const isLast = current === TOTAL - 1;
+    tour.next();
+  }, [router, tour]);
 
-  const variants = {
-    enter: (d: number) => ({ x: d * 80, opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (d: number) => ({ x: d * -80, opacity: 0 }),
-  };
+  if (!tour.isActive) return null;
+
+  const isClickTargetStep =
+    tour.currentStep.action === 'analyze' ||
+    tour.currentStep.action === 'import' ||
+    tour.currentStep.action === 'deposit';
+  const isLoginStep = tour.currentStep.action === 'login';
 
   return (
-    <div className="fixed inset-0 bg-white z-[500] flex items-center justify-center">
-      <div className="w-full max-w-[430px] h-screen flex flex-col px-6 py-12">
-        {/* Header — 건너뛰기 */}
-        <div className="flex justify-end h-10 items-center">
-          {!isLast && (
-            <button
-              onClick={() => goTo(TOTAL - 1)}
-              className="text-sm text-gray-400 font-medium active:text-gray-600 transition-colors"
-            >
-              건너뛰기
-            </button>
-          )}
-        </div>
+    <div className="pointer-events-none fixed inset-0 z-[500]">
+      {!isLoginStep && <SpotlightScrim rect={targetRect} />}
+      {isLoginStep && <div className="pointer-events-auto absolute inset-0 bg-black/55 backdrop-blur-[2px]" />}
+      {!isLoginStep && <PulseRing rect={pulseRect} />}
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col items-center justify-center overflow-hidden">
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={current}
-              custom={direction}
-              variants={variants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.2}
-              onDragEnd={handleDragEnd}
-              className="flex flex-col items-center text-center px-4 select-none"
-            >
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className={`w-20 h-20 rounded-full flex items-center justify-center mb-8 ${slide.iconBg}`}
-              >
-                <Icon size={36} className={slide.iconColor} />
-              </motion.div>
-
-              <h2 className="text-2xl font-black text-gray-900 leading-tight whitespace-pre-line">
-                {slide.headline}
-              </h2>
-              <p className="text-sm text-gray-400 mt-3 leading-relaxed whitespace-pre-line">
-                {slide.description}
+      <motion.div
+        ref={tooltipRef}
+        key={tour.step}
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.18 }}
+        className="pointer-events-auto fixed max-w-[316px] rounded-2xl bg-gray-950 px-4 py-3.5 text-white shadow-2xl"
+        style={tooltipStyle}
+        data-tour-target={isLoginStep ? 'login-cta' : undefined}
+      >
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500">
+            <Sparkles size={15} className="text-white" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-[11px] font-black text-blue-200">
+                TOUR {tour.step} / {ONBOARDING_TOTAL_STEPS}
               </p>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/75">
+                체험용 샘플
+              </span>
+            </div>
+            <h2 className="mt-1.5 text-[15px] font-extrabold leading-snug tracking-normal [font-synthesis-weight:none]">{tour.currentStep.title}</h2>
+            <p className="mt-1.5 break-keep text-[13px] font-semibold leading-relaxed text-white/85">
+              {tour.currentStep.body}
+            </p>
 
-        {/* Dot indicators */}
-        <div className="flex justify-center gap-2 mb-6">
-          {SLIDES.map((_, i) => (
-            <motion.div
-              key={i}
-              className={`h-2 rounded-full ${i === current ? "bg-blue-500 w-5" : "bg-gray-200 w-2"}`}
-              layout
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-            />
-          ))}
+            {!isClickTargetStep && (
+              <button
+                type="button"
+                onClick={isLoginStep ? handleLogin : handleNext}
+                disabled={isLogging}
+                className="mt-3 h-10 w-full rounded-xl bg-blue-500 text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-60"
+              >
+                {isLoginStep && isLogging ? '로그인 중...' : tour.currentStep.actionLabel || '다음'}
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Bottom buttons */}
-        <div className="space-y-3 pb-4">
-          {isLast ? (
-            <button
-              onClick={handleLogin}
-              disabled={isLogging}
-              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-60"
-            >
-              {isLogging ? "로그인 중..." : "토스로 시작하기"}
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all"
-            >
-              다음
-            </button>
-          )}
-        </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

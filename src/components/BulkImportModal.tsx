@@ -12,6 +12,7 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { buildDepositBulkEntries, buildDepositReviewRows } from '../lib/depositImportRows';
 import { AI_ANALYSIS_FAILED_MESSAGE, ERROR_TOAST_AUTO_DISMISS_MS } from '@/src/lib/aiErrorMessage';
+import { useOnboardingTour } from './onboarding/OnboardingTourContext';
 
 interface BackupRow {
   targetName: string;
@@ -48,6 +49,39 @@ interface DepositRow extends DepositCandidate {
 }
 
 const BACKUP_REQUIRED_HEADERS = ['날짜', '구분', '이름', '금액', '종류'];
+
+const TOUR_DEPOSIT_CANDIDATES: DepositCandidate[] = [
+  {
+    senderName: '박서준',
+    amount: 80000,
+    bank: '토스뱅크',
+    date: '2026-05-23',
+    memo: '김민지 결혼 축의금',
+    confidence: 'high',
+    isLikelyEventRelated: true,
+    reason: '이름과 금액이 입금내역에서 명확하게 보였어요.',
+  },
+  {
+    senderName: '이하은',
+    amount: 50000,
+    bank: '국민은행',
+    date: '2026-05-22',
+    memo: '축하해',
+    confidence: 'medium',
+    isLikelyEventRelated: true,
+    reason: '메모에 축하 표현이 있어 받은 마음 후보로 분류했어요.',
+  },
+  {
+    senderName: '최유진',
+    amount: 100000,
+    bank: '신한은행',
+    date: '2026-05-20',
+    memo: '민지 결혼',
+    confidence: 'high',
+    isLikelyEventRelated: true,
+    reason: '결혼 관련 메모와 입금액을 함께 확인했어요.',
+  },
+];
 
 const EVENT_OPTIONS: Array<{ value: EventType; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
   { value: 'wedding', label: '결혼', Icon: Heart },
@@ -88,6 +122,7 @@ interface Props {
 
 export default function BulkImportModal({ isOpen, onClose }: Props) {
   const { bulkAddEntries, refreshCredits } = useStore();
+  const tour = useOnboardingTour();
   const [step, setStep] = useState<'upload' | 'fileOptions' | 'mapping' | 'preview' | 'depositReview'>('upload');
   const [csvData, setCsvData] = useState<RawCSVData | null>(null);
   const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
@@ -231,6 +266,15 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   };
 
   const handleDepositImagePick = async () => {
+    if (tour.handleTargetAction('deposit')) {
+      setDepositRows(buildDepositReviewRows(TOUR_DEPOSIT_CANDIDATES));
+      setDepositCreditToken(null);
+      setImportMode('deposit');
+      setStep('depositReview');
+      setError(null);
+      return;
+    }
+
     if (!isAppsInToss()) {
       depositFileInputRef.current?.click();
       return;
@@ -606,6 +650,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   type="button"
                   onClick={handleDepositImagePick}
                   disabled={isAnalyzingDeposit}
+                  data-tour-target="bulk-import-deposit-button"
                   className="w-full border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
                   <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
@@ -831,7 +876,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
             )}
 
             {step === 'depositReview' && (
-              <div className="space-y-4">
+              <div className="space-y-4" data-tour-target="bulk-import-deposit-review">
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
