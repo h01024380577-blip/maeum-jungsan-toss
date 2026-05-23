@@ -10,29 +10,15 @@ import { apiFetch, setAuthToken } from '@/src/lib/apiClient';
 import { tossLogin } from '@/src/lib/tossAuth';
 import { useOnboardingTour } from '@/src/components/onboarding/OnboardingTourContext';
 import { ONBOARDING_TOTAL_STEPS } from '@/src/components/onboarding/onboardingTour';
+import {
+  calculateTooltipStyle,
+  type TourBounds,
+  type TourPlacement,
+  type TourRect,
+} from '@/src/components/onboarding/tooltipPosition';
 
 interface OnboardingProps {
   onComplete: () => void;
-}
-
-interface TourRect {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
-interface TourBounds {
-  top: number;
-  left: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function expandRect(rect: TourRect, padding: number): TourRect {
@@ -154,7 +140,7 @@ function PulseRing({ rect }: { rect: TourRect | null }) {
 
 function getTooltipStyle(
   rect: TourRect | null,
-  placement: 'top' | 'bottom' | 'center' = 'bottom',
+  placement: TourPlacement = 'bottom',
   measuredHeight = 0,
 ): CSSProperties {
   if (typeof window === 'undefined') {
@@ -165,56 +151,13 @@ function getTooltipStyle(
     };
   }
 
-  const bounds = readTourBounds();
-  const margin = 16;
-  const gap = 14;
-  const minTooltipHeight = 160;
-  const estimatedCenterHeight = 224;
-  const centerHeight = measuredHeight > 0 ? measuredHeight : estimatedCenterHeight;
-  const width = Math.max(240, Math.min(316, bounds.width - margin * 2));
-  const minLeft = bounds.left + margin;
-  const maxLeft = Math.max(minLeft, bounds.right - width - margin);
-
-  if (placement === 'center' || !rect) {
-    const left = clamp(bounds.left + bounds.width / 2 - width / 2, minLeft, maxLeft);
-    const minTop = bounds.top + margin;
-    const maxTop = Math.max(minTop, bounds.bottom - centerHeight - margin);
-    const top = clamp(bounds.top + bounds.height / 2 - centerHeight / 2, minTop, maxTop);
-    return { left, top, width };
-  }
-
-  const left = clamp(rect.left + rect.width / 2 - width / 2, minLeft, maxLeft);
-  const placeAbove = (): CSSProperties => {
-    const targetTop = Math.max(bounds.top + margin + gap, rect.top);
-    const availableHeight = Math.max(minTooltipHeight, targetTop - bounds.top - margin - gap);
-    return {
-      left,
-      bottom: Math.max(0, window.innerHeight - targetTop + gap),
-      width,
-      maxHeight: availableHeight,
-      overflowY: 'auto',
-    };
-  };
-  const placeBelow = (): CSSProperties => {
-    const top = rect.top + rect.height + gap;
-    const maxTop = Math.max(bounds.top + margin, bounds.bottom - minTooltipHeight - margin);
-    const safeTop = clamp(top, bounds.top + margin, maxTop);
-    return {
-      left,
-      top: safeTop,
-      width,
-      maxHeight: Math.max(minTooltipHeight, bounds.bottom - safeTop - margin),
-      overflowY: 'auto',
-    };
-  };
-
-  if (placement === 'top') {
-    const availableAbove = rect.top - bounds.top - margin - gap;
-    return availableAbove >= minTooltipHeight ? placeAbove() : placeBelow();
-  }
-
-  const availableBelow = bounds.bottom - (rect.top + rect.height + gap) - margin;
-  return availableBelow >= minTooltipHeight ? placeBelow() : placeAbove();
+  return calculateTooltipStyle({
+    rect,
+    placement,
+    measuredHeight,
+    bounds: readTourBounds(),
+    viewportHeight: window.innerHeight,
+  });
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
