@@ -12,6 +12,8 @@ import { useOnboardingTour } from '@/src/components/onboarding/OnboardingTourCon
 import { ONBOARDING_TOTAL_STEPS } from '@/src/components/onboarding/onboardingTour';
 import {
   calculateTooltipStyle,
+  expandRectWithinBounds,
+  intersectRect,
   type TourBounds,
   type TourPlacement,
   type TourRect,
@@ -21,13 +23,22 @@ interface OnboardingProps {
   onComplete: () => void;
 }
 
-function expandRect(rect: TourRect, padding: number): TourRect {
+function boundsFromDomRect(rect: DOMRect): TourBounds {
   return {
-    top: Math.max(0, rect.top - padding),
-    left: Math.max(0, rect.left - padding),
-    width: rect.width + padding * 2,
-    height: rect.height + padding * 2,
+    top: rect.top,
+    left: rect.left,
+    right: rect.right,
+    bottom: rect.bottom,
+    width: rect.width,
+    height: rect.height,
   };
+}
+
+function clipsChildren(element: HTMLElement): boolean {
+  const style = window.getComputedStyle(element);
+  return [style.overflow, style.overflowX, style.overflowY].some((value) =>
+    value === 'auto' || value === 'scroll' || value === 'hidden' || value === 'clip',
+  );
 }
 
 function readTargetRect(targetId?: string): TourRect | null {
@@ -36,12 +47,26 @@ function readTargetRect(targetId?: string): TourRect | null {
   if (!target) return null;
   const rect = target.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
-  return {
+
+  let visibleRect: TourRect = {
     top: rect.top,
     left: rect.left,
     width: rect.width,
     height: rect.height,
   };
+
+  let parent = target.parentElement;
+  while (parent && parent !== document.body) {
+    if (clipsChildren(parent)) {
+      visibleRect = intersectRect(visibleRect, boundsFromDomRect(parent.getBoundingClientRect()));
+      if (visibleRect.width <= 0 || visibleRect.height <= 0) return null;
+    }
+    parent = parent.parentElement;
+  }
+
+  visibleRect = intersectRect(visibleRect, readTourBounds());
+  if (visibleRect.width <= 0 || visibleRect.height <= 0) return null;
+  return visibleRect;
 }
 
 function readTourBounds(): TourBounds {
@@ -103,27 +128,36 @@ function useTourRect(targetId?: string, isActive = false) {
 }
 
 function SpotlightScrim({ rect }: { rect: TourRect | null }) {
+  const bounds = readTourBounds();
+
   if (!rect) {
-    return <div className="pointer-events-auto absolute inset-0 bg-black/50 backdrop-blur-[1px]" />;
+    return (
+      <div
+        className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]"
+        style={{ top: bounds.top, left: bounds.left, width: bounds.width, height: bounds.height }}
+      />
+    );
   }
 
-  const hole = expandRect(rect, 8);
+  const visibleRect = intersectRect(rect, bounds);
+  const hole = expandRectWithinBounds(visibleRect, 8, bounds);
   const bottom = hole.top + hole.height;
   const right = hole.left + hole.width;
 
   return (
     <>
-      <div className="pointer-events-auto fixed left-0 top-0 w-full bg-black/50 backdrop-blur-[1px]" style={{ height: hole.top }} />
-      <div className="pointer-events-auto fixed left-0 bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, width: hole.left, height: hole.height }} />
-      <div className="pointer-events-auto fixed right-0 bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: right, height: hole.height }} />
-      <div className="pointer-events-auto fixed bottom-0 left-0 w-full bg-black/50 backdrop-blur-[1px]" style={{ top: bottom }} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bounds.top, left: bounds.left, width: bounds.width, height: Math.max(0, hole.top - bounds.top) }} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: bounds.left, width: Math.max(0, hole.left - bounds.left), height: hole.height }} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: right, width: Math.max(0, bounds.right - right), height: hole.height }} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bottom, left: bounds.left, width: bounds.width, height: Math.max(0, bounds.bottom - bottom) }} />
     </>
   );
 }
 
 function PulseRing({ rect }: { rect: TourRect | null }) {
   if (!rect) return null;
-  const ring = expandRect(rect, 6);
+  const bounds = readTourBounds();
+  const ring = expandRectWithinBounds(intersectRect(rect, bounds), 6, bounds);
 
   return (
     <div
