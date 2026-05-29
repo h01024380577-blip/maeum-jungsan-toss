@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { ThemeProvider as TdsThemeProvider } from "@toss/tds-mobile";
 import { useStore } from "@/src/store/useStore";
-import Onboarding from "@/src/components/Onboarding";
-import { OnboardingTourProvider } from "@/src/components/onboarding/OnboardingTourContext";
+import IntroScreen from "@/src/components/onboarding/IntroScreen";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
 
 const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
@@ -24,10 +23,12 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
     loadFromSupabase();
   }, [loadFromSupabase]);
 
-  // 비로그인 상태면 온보딩 상태 초기화 (로그아웃 후 온보딩 재표시)
+  // 비로그인 상태면 모든 온보딩 상태 초기화 (탈퇴·로그아웃 후 재표시)
   useEffect(() => {
     if (isLoaded && !tossUserId) {
       localStorage.removeItem('heartbook-onboarding-seen');
+      localStorage.removeItem('heartbook-ai-onboarding-seen');
+      localStorage.removeItem('heartbook-import-onboarding-seen');
       setHasSeenOnboarding(false);
     }
   }, [isLoaded, tossUserId]);
@@ -51,10 +52,10 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   const showOnboarding = !tossUserId && !SKIP_ONBOARDING_PATHS.includes(pathname);
 
   return (
-    <OnboardingTourProvider enabled={showOnboarding}>
+    <>
       {children}
       {showOnboarding && (
-        <Onboarding onComplete={handleOnboardingComplete} />
+        <IntroScreen onComplete={handleOnboardingComplete} />
       )}
       <Toaster
         position="top-center"
@@ -85,7 +86,7 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
           },
         }}
       />
-    </OnboardingTourProvider>
+    </>
   );
 }
 

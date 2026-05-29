@@ -54,11 +54,15 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(home).not.toContain('초대장 URL을 붙여넣으세요');
   });
 
-  it('defaults the home input mode to URL', () => {
+  it('AI analysis sheet shows URL input by default (no text/URL mode toggle)', () => {
     const home = read('src/tabs/HomeTab.tsx');
 
-    expect(home).toContain("useState<'text' | 'url'>('url')");
-    expect(home).not.toContain("useState<'text' | 'url'>('text')");
+    // URL 입력 textarea가 AI 바텀시트 안에 있어야 함
+    expect(home).toContain('aiInputUrl');
+    // 구 inputMode 토글 상태는 제거됨
+    expect(home).not.toContain("useState<'text' | 'url'>");
+    // AI 바텀시트 상태가 존재해야 함
+    expect(home).toContain('showAiSheet');
   });
 
   it('keeps the live banner ad group as a fallback when env is missing', () => {

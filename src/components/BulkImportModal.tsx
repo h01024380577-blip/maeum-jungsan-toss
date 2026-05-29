@@ -12,7 +12,6 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { buildDepositBulkEntries, buildDepositReviewRows } from '../lib/depositImportRows';
 import { AI_ANALYSIS_FAILED_MESSAGE, ERROR_TOAST_AUTO_DISMISS_MS } from '@/src/lib/aiErrorMessage';
-import { useOnboardingTour } from './onboarding/OnboardingTourContext';
 
 interface BackupRow {
   targetName: string;
@@ -122,7 +121,6 @@ interface Props {
 
 export default function BulkImportModal({ isOpen, onClose }: Props) {
   const { bulkAddEntries, refreshCredits } = useStore();
-  const tour = useOnboardingTour();
   const [step, setStep] = useState<'upload' | 'fileOptions' | 'mapping' | 'preview' | 'depositReview'>('upload');
   const [csvData, setCsvData] = useState<RawCSVData | null>(null);
   const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
@@ -266,15 +264,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   };
 
   const handleDepositImagePick = async () => {
-    if (tour.handleTargetAction('deposit')) {
-      setDepositRows(buildDepositReviewRows(TOUR_DEPOSIT_CANDIDATES));
-      setDepositCreditToken(null);
-      setImportMode('deposit');
-      setStep('depositReview');
-      setError(null);
-      return;
-    }
-
     if (!isAppsInToss()) {
       depositFileInputRef.current?.click();
       return;
@@ -623,8 +612,16 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
+            drag={isBusy ? false : 'y'}
+            dragConstraints={{ top: 0 }}
+            dragElastic={{ top: 0, bottom: 0.3 }}
+            onDragEnd={(_, { offset, velocity }) => {
+              if (!isBusy && (offset.y > 80 || velocity.y > 500)) handleClose();
+            }}
             className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white rounded-t-[32px] p-6 z-[110] shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{ touchAction: 'none' }}
           >
+            <div className="mx-auto mb-4 -mt-2 h-1 w-12 cursor-grab rounded-full bg-gray-300 active:cursor-grabbing" />
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-xl font-bold">대량 가져오기</h2>
@@ -650,7 +647,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                   type="button"
                   onClick={handleDepositImagePick}
                   disabled={isAnalyzingDeposit}
-                  data-tour-target="bulk-import-deposit-button"
                   className="w-full border-2 border-dashed border-blue-200 bg-blue-50/40 rounded-3xl p-6 flex flex-col items-center justify-center space-y-3 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
                   <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
@@ -876,7 +872,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
             )}
 
             {step === 'depositReview' && (
-              <div className="space-y-4" data-tour-target="bulk-import-deposit-review">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <button
                     type="button"

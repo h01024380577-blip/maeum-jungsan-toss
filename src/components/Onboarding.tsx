@@ -127,7 +127,7 @@ function useTourRect(targetId?: string, isActive = false) {
   return rect;
 }
 
-function SpotlightScrim({ rect }: { rect: TourRect | null }) {
+function SpotlightScrim({ rect, onTap }: { rect: TourRect | null; onTap: () => void }) {
   const bounds = readTourBounds();
 
   if (!rect) {
@@ -135,6 +135,7 @@ function SpotlightScrim({ rect }: { rect: TourRect | null }) {
       <div
         className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]"
         style={{ top: bounds.top, left: bounds.left, width: bounds.width, height: bounds.height }}
+        onClick={onTap}
       />
     );
   }
@@ -146,10 +147,10 @@ function SpotlightScrim({ rect }: { rect: TourRect | null }) {
 
   return (
     <>
-      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bounds.top, left: bounds.left, width: bounds.width, height: Math.max(0, hole.top - bounds.top) }} />
-      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: bounds.left, width: Math.max(0, hole.left - bounds.left), height: hole.height }} />
-      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: right, width: Math.max(0, bounds.right - right), height: hole.height }} />
-      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bottom, left: bounds.left, width: bounds.width, height: Math.max(0, bounds.bottom - bottom) }} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bounds.top, left: bounds.left, width: bounds.width, height: Math.max(0, hole.top - bounds.top) }} onClick={onTap} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: bounds.left, width: Math.max(0, hole.left - bounds.left), height: hole.height }} onClick={onTap} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: hole.top, left: right, width: Math.max(0, bounds.right - right), height: hole.height }} onClick={onTap} />
+      <div className="pointer-events-auto fixed bg-black/50 backdrop-blur-[1px]" style={{ top: bottom, left: bounds.left, width: bounds.width, height: Math.max(0, bounds.bottom - bottom) }} onClick={onTap} />
     </>
   );
 }
@@ -290,7 +291,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[500]">
-      {!isLoginStep && <SpotlightScrim rect={targetRect} />}
+      {!isLoginStep && <SpotlightScrim rect={targetRect} onTap={handleNext} />}
       {isLoginStep && <div className="pointer-events-auto absolute inset-0 bg-black/55 backdrop-blur-[2px]" />}
       {!isLoginStep && <PulseRing rect={pulseRect} />}
 

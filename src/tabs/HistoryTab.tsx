@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useStore, type EventEntry } from '../store/useStore';
 import { Search, Trash2, Heart, Flower2, Cake, Star, FileSpreadsheet, Upload, CheckSquare, Square, StickyNote } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -6,10 +6,27 @@ import { toast } from 'sonner';
 import BulkImportModal from '../components/BulkImportModal';
 import ContactDetail from '../components/ContactDetail';
 import EntryEditSheet from '../components/EntryEditSheet';
-import { useOnboardingTour } from '../components/onboarding/OnboardingTourContext';
+import SlideOnboarding, { type OnboardingSlide } from '../components/onboarding/SlideOnboarding';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { exportToCsv } from '../utils/csvExport';
 import { formatAmountMan } from '../utils/amountFormat';
+
+const IMPORT_ONBOARDING_KEY = 'heartbook-import-onboarding-seen';
+
+const IMPORT_SLIDES: OnboardingSlide[] = [
+  {
+    image: '/onboarding/maeum-onboarding-import-01-deposit.png',
+    imageAlt: '입금 내역 분석 예시',
+    title: '입금 내역을 분석해요',
+    body: '카카오페이·토스 입금 내역 이미지를 업로드하면 받은 마음을 자동으로 인식해줘요.',
+  },
+  {
+    image: '/onboarding/maeum-onboarding-import-02-csv.png',
+    imageAlt: 'CSV 가져오기 예시',
+    title: 'CSV로도 가져올 수 있어요',
+    body: '기존에 쓰던 엑셀·스프레드시트를 CSV로 내보내면 한번에 불러올 수 있어요.',
+  },
+];
 
 const eventIcon = (t: string) => {
   if (t === 'wedding') return <Heart size={14} className="text-pink-500 fill-pink-500" />;
@@ -26,7 +43,10 @@ const safeDate = (d: string) => {
 
 export default function HistoryTab() {
   const { entries, removeEntry, contacts } = useStore();
-  const tour = useOnboardingTour();
+  const [showImportOnboarding, setShowImportOnboarding] = useState(false);
+  const [highlightImport, setHighlightImport] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem(IMPORT_ONBOARDING_KEY) !== 'true'
+  );
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'given' | 'received'>('all');
   const [importOpen, setImportOpen] = useState(false);
@@ -38,29 +58,6 @@ export default function HistoryTab() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const tourToday = format(new Date(), 'yyyy-MM-dd');
-  const tourSavedEntries = useMemo<EventEntry[]>(() => ([
-    {
-      id: 'tour-expense-1',
-      contactId: '',
-      eventType: 'wedding',
-      type: 'EXPENSE',
-      date: tourToday,
-      location: '라움아트센터',
-      targetName: '김민지',
-      account: '',
-      amount: 100000,
-      relation: '친구',
-      recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
-      memo: '체험용 샘플',
-      isIncome: false,
-      createdAt: Date.now(),
-      userId: 'tour',
-    },
-  ]), [tourToday]);
-  const displayEntries = tour.isActive && tour.step >= 6
-    ? tourSavedEntries
-    : entries;
 
   const handleExport = async () => {
     if (isExporting) return;
@@ -96,11 +93,13 @@ export default function HistoryTab() {
   };
 
   const handleImportClick = () => {
-    if (tour.handleTargetAction('import')) {
+    setHighlightImport(false);
+    const seen = typeof window !== 'undefined' && localStorage.getItem(IMPORT_ONBOARDING_KEY) === 'true';
+    if (!seen) {
+      setShowImportOnboarding(true);
+    } else {
       setImportOpen(true);
-      return;
     }
-    setImportOpen(true);
   };
 
   const clearSelection = () => {
@@ -125,7 +124,7 @@ export default function HistoryTab() {
     });
   };
 
-  const filtered = displayEntries.filter(e => {
+  const filtered = entries.filter(e => {
     const s = search.toLowerCase().trim();
     const eventLabelText = eventLabel(e.eventType, e.customEventName);
     // 부고는 '장례'로도 검색되도록 동의어 처리
@@ -194,17 +193,29 @@ export default function HistoryTab() {
 
   return (
     <div className="pb-4">
+      {showImportOnboarding && (
+        <SlideOnboarding
+          slides={IMPORT_SLIDES}
+          doneLabel="가져오기 시작"
+          onClose={() => {
+            localStorage.setItem(IMPORT_ONBOARDING_KEY, 'true');
+            setShowImportOnboarding(false);
+            setImportOpen(true);
+          }}
+        />
+      )}
+
       <div className="px-5 pt-14 pb-4 bg-white max-[360px]:px-4">
         <div className="flex items-center justify-between gap-2 max-[360px]:gap-1.5">
           <div className="min-w-0">
             <h1 className="whitespace-nowrap text-[22px] font-black text-gray-900 tracking-tight max-[360px]:text-[20px]">전체 내역</h1>
-            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400 max-[360px]:text-[11px]">{displayEntries.length}건의 기록</p>
+            <p className="mt-0.5 truncate whitespace-nowrap text-xs text-gray-400 max-[360px]:text-[11px]">{entries.length}건의 기록</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 max-[420px]:gap-1">
             <button
               type="button"
               onClick={toggleSelectionMode}
-              disabled={displayEntries.length === 0 || isDeleting}
+              disabled={entries.length === 0 || isDeleting}
               aria-label={selectionMode ? '선택 취소' : '내역 선택'}
               className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-colors active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:w-9 max-[420px]:px-0 ${
                 selectionMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -227,9 +238,12 @@ export default function HistoryTab() {
               type="button"
               onClick={handleImportClick}
               disabled={selectionMode}
-              data-tour-target="history-import-button"
               aria-label="가져오기"
-              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-blue-50 px-2.5 text-[11px] font-bold whitespace-nowrap break-keep text-blue-600 transition-colors hover:bg-blue-100 active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px]"
+              className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-all active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px] ${
+                highlightImport
+                  ? 'bg-blue-500 text-white ring-[2px] ring-offset-1 ring-blue-300 shadow-sm shadow-blue-200'
+                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+              }`}
             >
               <FileSpreadsheet size={14} />
               <span className="whitespace-nowrap break-keep leading-none">가져오기</span>
@@ -288,7 +302,6 @@ export default function HistoryTab() {
             <div
               key={e.id}
               onClick={() => selectionMode ? toggleEntrySelection(e.id) : setEditTarget({ ...e })}
-              data-tour-target={tour.isActive && e.id === 'tour-expense-1' ? 'history-saved-entry' : undefined}
               className={`grid items-center gap-3 bg-white p-4 rounded-2xl border group relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all max-[360px]:gap-2 max-[360px]:p-3.5 ${
                 selectionMode ? 'grid-cols-[auto_minmax(0,1fr)]' : 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
               } ${

@@ -1,30 +1,35 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
-import { Send, Sparkles, ArrowUpRight, ArrowDownLeft, Link as LinkIcon, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info, StickyNote } from 'lucide-react';
+import SlideOnboarding, { type OnboardingSlide } from '../components/onboarding/SlideOnboarding';
+import { Sparkles, ArrowUpRight, ArrowDownLeft, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
-import EntryEditSheet from '../components/EntryEditSheet';
 import { useBackHandler } from '../hooks/useBackHandler';
-import { useOnboardingTour } from '../components/onboarding/OnboardingTourContext';
-import { formatAmountMan, formatManInputValue, formatSignedAmountMan, parseManInputToWon } from '../utils/amountFormat';
+import { formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { openExternalUrl } from '../lib/openExternalUrl';
 
+const AI_ONBOARDING_KEY = 'heartbook-ai-onboarding-seen';
 
-
-// 계좌번호 문자열에서 은행명과 계좌번호 파싱
-// 예: "신한은행 110-123-456789 김진호" → { bank: "신한은행", accountNo: "110-123-456789" }
-function parseAccount(account: string): { bank: string; accountNo: string } {
-  const parts = account.trim().split(/\s+/);
-  const bank = parts[0] || '';
-  const accountNo = parts[1] || '';
-  return { bank, accountNo };
-}
+const AI_SLIDES: OnboardingSlide[] = [
+  {
+    image: '/onboarding/maeum-onboarding-ai-01-parse.png',
+    imageAlt: 'AI 자동 입력 예시',
+    title: 'AI가 폼을 채워줘요',
+    body: '청첩장·부고장 링크나 이미지를 붙여넣으면 이름·날짜·장소를 자동으로 채워줘요.',
+  },
+  {
+    image: '/onboarding/maeum-onboarding-ai-02-amount.png',
+    imageAlt: '금액 추천 예시',
+    title: '금액도 추천해줘요',
+    body: '과거 내역과 관계를 분석해 보낼 금액을 추천해 드려요. 직접 수정도 가능해요.',
+  },
+];
 
 // 금액 추천 로직: 과거 이력·관계·장소를 분석해 상황별 문구 풀에서 매칭되는 구절을 랜덤 선택
 function recommendAmount(parsed: any, entries: EventEntry[]): { amt: number; reason: string } {
@@ -85,7 +90,6 @@ function recommendAmount(parsed: any, entries: EventEntry[]): { amt: number; rea
 
 // HTTP 환경에서도 동작하는 클립보드 복사
 async function copyToClipboard(text: string): Promise<void> {
-  // 앱인토스 환경
   if (isAppsInToss()) {
     const { setClipboardText } = await import('@apps-in-toss/web-framework');
     if (!(await ensureTossPermission(setClipboardText))) {
@@ -94,12 +98,10 @@ async function copyToClipboard(text: string): Promise<void> {
     await setClipboardText(text);
     return;
   }
-  // HTTPS 환경
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(text);
     return;
   }
-  // HTTP fallback (execCommand)
   const el = document.createElement('textarea');
   el.value = text;
   el.style.position = 'fixed';
@@ -112,7 +114,6 @@ async function copyToClipboard(text: string): Promise<void> {
   if (!ok) throw new Error('copy failed');
 }
 
-// 앱인토스 WebView 환경 감지
 function isAppsInToss(): boolean {
   return typeof window !== 'undefined' &&
     window.navigator.userAgent.includes('TossApp');
@@ -148,8 +149,6 @@ const eventOptions: { value: EventType; label: string; Icon: typeof Heart }[] = 
   { value: 'other', label: '기타', Icon: Star },
 ];
 
-type MonthEntryFilter = 'INCOME' | 'EXPENSE' | 'ALL';
-
 function formatSheetDate(value?: string) {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00`);
@@ -158,190 +157,61 @@ function formatSheetDate(value?: string) {
   return `${format(date, 'yyyy.MM.dd')} (${weekday})`;
 }
 
-function formatEntryDate(value?: string) {
-  if (!value) return '';
-  try {
-    const date = parseISO(value);
-    if (isNaN(date.getTime())) return value;
-    return format(date, 'M월 d일');
-  } catch {
-    return value;
-  }
-}
-
-function isLikelyUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed || /\s/.test(trimmed)) return false;
-  try {
-    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    const url = new URL(candidate);
-    return url.hostname.includes('.');
-  } catch {
-    return false;
-  }
-}
+const defaultFormData = (): Partial<EventEntry> => ({
+  targetName: '',
+  date: format(new Date(), 'yyyy-MM-dd'),
+  eventType: 'other' as EventType,
+  type: 'EXPENSE',
+  isIncome: false,
+  location: '',
+  relation: '',
+  amount: 0,
+  account: '',
+  memo: '',
+  recommendationReason: '',
+  customEventName: '',
+  contactId: '',
+});
 
 export default function HomeTab() {
   const router = useRouter();
-  const tour = useOnboardingTour();
-  const handleTossLogin = () => {
-    router.push('/intro');
-  };
-  const { entries, addEntry, addFeedback, contacts, loadFromSupabase, tossUserId, tossUserName, refreshCredits } = useStore();
-  const [inputText, setInputText] = useState('');
-  const [inputUrl, setInputUrl] = useState('');
-  const [inputMode, setInputMode] = useState<'text' | 'url'>('url');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName, refreshCredits } = useStore();
+
+  // AI 슬라이드 온보딩 + 첫 진입 강조
+  const [showAiOnboarding, setShowAiOnboarding] = useState(false);
+  const [highlightAiBanner, setHighlightAiBanner] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem(AI_ONBOARDING_KEY) !== 'true'
+  );
+
+  // AI 분석 시트
+  const [showAiSheet, setShowAiSheet] = useState(false);
+  const [aiInputUrl, setAiInputUrl] = useState('');
+  const [aiSelectedImage, setAiSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [adPromptOpen, setAdPromptOpen] = useState(false);
-  const [parsedData, setParsedData] = useState<Partial<EventEntry> | null>(null);
-  const [initialParsedData, setInitialParsedData] = useState<Partial<EventEntry> | null>(null);
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
+
+  // 메인 폼 상태
+  const [formData, setFormData] = useState<Partial<EventEntry>>(defaultFormData());
+  const [initialFormData, setInitialFormData] = useState<Partial<EventEntry> | null>(null);
+
+  // 토스페이 송금 모달
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [savedAccount, setSavedAccount] = useState('');
-  const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
-  const [monthEntryFilter, setMonthEntryFilter] = useState<MonthEntryFilter | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useBackHandler(showBottomSheet || showTransferModal || adPromptOpen, () => {
-    if (adPromptOpen) {
-      setAdPromptOpen(false);
-      return true;
-    }
+  const updateFormData = useCallback((next: Partial<EventEntry>) => {
+    setFormData(next);
+  }, []);
 
-    if (showTransferModal) {
-      setShowTransferModal(false);
-      return true;
-    }
-
-    if (showBottomSheet) {
-      setShowBottomSheet(false);
-      return true;
-    }
-
+  useBackHandler(showAiSheet || showTransferModal || adPromptOpen, () => {
+    if (adPromptOpen) { setAdPromptOpen(false); return true; }
+    if (showTransferModal) { setShowTransferModal(false); return true; }
+    if (showAiSheet) { setShowAiSheet(false); return true; }
     return false;
   });
 
-  useBackHandler(!!monthEntryFilter, () => {
-    setMonthEntryFilter(null);
-    return true;
-  });
-
-  useEffect(() => {
-    if (!tour.isActive) return;
-    const targetByStep: Record<number, string> = {
-      2: 'input-card',
-      3: 'result-info',
-      4: 'amount-card',
-    };
-    const targetId = targetByStep[tour.step];
-    if (!targetId) return;
-
-    const timer = window.setTimeout(() => {
-      document
-        .querySelector(`[data-tour-target="${targetId}"]`)
-        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 180);
-
-    return () => window.clearTimeout(timer);
-  }, [tour.isActive, tour.step]);
-
-  const now = new Date();
-  const tourToday = format(now, 'yyyy-MM-dd');
-  const tourResultData = useMemo<Partial<EventEntry>>(() => ({
-    id: 'tour-result',
-    contactId: '',
-    eventType: 'wedding',
-    type: 'EXPENSE',
-    date: tourToday,
-    location: '라움아트센터',
-    targetName: '김민지',
-    account: '토스뱅크 1000-1234-5678 김민지',
-    amount: 100000,
-    relation: '친구',
-    recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
-    memo: '체험용 샘플',
-    isIncome: false,
-    createdAt: now.getTime(),
-    userId: 'tour',
-  }), [now, tourToday]);
-  const tourSavedEntries = useMemo<EventEntry[]>(() => ([
-    {
-      id: 'tour-expense-1',
-      contactId: '',
-      eventType: 'wedding',
-      type: 'EXPENSE',
-      date: tourToday,
-      location: '라움아트센터',
-      targetName: '김민지',
-      account: '',
-      amount: 100000,
-      relation: '친구',
-      recommendationReason: '친구 관계와 예식장 정보를 보고 추천했어요',
-      memo: '체험용 샘플',
-      isIncome: false,
-      createdAt: now.getTime(),
-      userId: 'tour',
-    },
-  ]), [now, tourToday]);
-
-  useEffect(() => {
-    if (!tour.isActive || !tour.isStep(5)) return;
-    setSavedAccount(tourResultData.account || '');
-    setShowTransferModal(true);
-
-    return () => setShowTransferModal(false);
-  }, [tour, tourResultData.account]);
-
-  const displayEntries = tour.isActive && tour.step >= 5
-    ? tourSavedEntries
-    : entries;
-  const monthEntries = displayEntries.filter((entry) => {
-    try {
-      const date = parseISO(entry.date);
-      return !isNaN(date.getTime()) && date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
-    } catch {
-      return false;
-    }
-  });
-  const monthGiven = monthEntries.filter(e => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
-  const monthReceived = monthEntries.filter(e => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
-  const monthBalance = monthReceived - monthGiven;
-  const visibleMonthEntries = monthEntryFilter === 'INCOME'
-    ? monthEntries.filter(e => e.type === 'INCOME')
-    : monthEntryFilter === 'EXPENSE'
-    ? monthEntries.filter(e => e.type === 'EXPENSE')
-    : monthEntries;
-  const monthSheetTitle =
-    monthEntryFilter === 'INCOME' ? '이번 달 받은 마음'
-    : monthEntryFilter === 'EXPENSE' ? '이번 달 보낸 마음'
-    : '이번 달 마음정산';
-  const monthSheetAmount =
-    monthEntryFilter === 'INCOME' ? formatAmountMan(monthReceived)
-    : monthEntryFilter === 'EXPENSE' ? formatAmountMan(monthGiven)
-    : formatSignedAmountMan(monthBalance);
-  const monthSheetTone =
-    monthEntryFilter === 'EXPENSE' ? 'text-red-500'
-    : monthEntryFilter === 'ALL' && monthBalance === 0 ? 'text-gray-500'
-    : monthEntryFilter === 'ALL' && monthBalance < 0 ? 'text-red-500'
-    : 'text-blue-600';
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const imageData = normalizeImageDataUri(reader.result as string | null);
-        if (!imageData) {
-          toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
-          return;
-        }
-        setSelectedImage(imageData);
-        handleParse({ type: 'image', data: imageData });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const greetingName = tossUserName?.trim() ? `${tossUserName.trim().replace(/님$/, '')}님` : '손님';
 
   const handleCameraCapture = async () => {
     if (!isAppsInToss()) { fileInputRef.current?.click(); return; }
@@ -357,8 +227,8 @@ export default function HomeTab() {
         toast.error('사진을 가져오지 못했어요. 다시 촬영해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      setSelectedImage(imageData);
-      handleParse({ type: 'image', data: imageData });
+      setAiSelectedImage(imageData);
+      handleAiParse({ type: 'image', data: imageData });
     } catch {
       toast.error('카메라를 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
@@ -378,24 +248,37 @@ export default function HomeTab() {
         toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
         return;
       }
-      setSelectedImage(imageData);
-      handleParse({ type: 'image', data: imageData });
+      setAiSelectedImage(imageData);
+      handleAiParse({ type: 'image', data: imageData });
     } catch {
       toast.error('앨범을 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
   };
 
-  const handleParse = async (params?: { type: 'text' | 'url' | 'image'; data: string } | string) => {
-    let type: 'text' | 'url' | 'image' = 'text';
-    let data = '';
-    if (typeof params === 'string') { data = params; }
-    else if (params) { type = params.type; data = params.data; }
-    else { type = inputUrl.trim() ? 'url' : 'text'; data = type === 'url' ? inputUrl : inputText; }
-    if (!data?.trim()) return;
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const imageData = normalizeImageDataUri(reader.result as string | null);
+        if (!imageData) {
+          toast.error('사진을 가져오지 못했어요. 다시 선택해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
+          return;
+        }
+        setAiSelectedImage(imageData);
+        handleAiParse({ type: 'image', data: imageData });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAiParse = async (params?: { type: 'url' | 'image'; data: string }) => {
+    const type = params?.type ?? 'url';
+    const data = params?.data ?? aiInputUrl.trim();
+    if (!data) return;
 
     setIsParsing(true);
     try {
-      // 모든 분석을 서버 API Route로 위임 (NEXT_PUBLIC 키 노출 제거)
       const res = await apiFetch('/api/analyze', {
         method: 'POST',
         body: JSON.stringify({ type, data }),
@@ -414,35 +297,34 @@ export default function HomeTab() {
         } else {
           toast.error('분석 실패. 직접 입력을 이용해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
         }
-        setSelectedImage(null); setInputUrl(''); setInputText('');
+        setAiSelectedImage(null);
+        setAiInputUrl('');
         setIsParsing(false);
         return;
       }
 
       const parsed = result.data;
-
       const { amt, reason } = recommendAmount(parsed, entries);
 
       const rawDate = parsed.date || format(new Date(), 'yyyy-MM-dd');
-      // 날짜를 yyyy-MM-dd 형식으로 정규화
       let normalizedDate = rawDate;
       try {
         const d = new Date(rawDate);
         if (!isNaN(d.getTime())) normalizedDate = format(d, 'yyyy-MM-dd');
       } catch {}
-      // 방어 코드: AI가 targetName에 "김진호, 이나은" 처럼 합쳐서 넣은 경우 자동 분리
+
       let targetName = parsed.targetName || '';
       let suggestedNames = parsed.suggestedNames || [];
       if (targetName.includes(',') && (!Array.isArray(suggestedNames) || suggestedNames.length === 0)) {
         const names = targetName.split(/[,，]\s*/).map((n: string) => n.trim()).filter(Boolean);
         if (names.length >= 2) {
-          const eventType = parsed.eventType || 'other';
-          const roles = eventType === 'wedding' ? ['신랑측', '신부측'] : eventType === 'funeral' ? ['고인', '상주'] : ['주인공', '관련인'];
+          const et = parsed.eventType || 'other';
+          const roles = et === 'wedding' ? ['신랑측', '신부측'] : et === 'funeral' ? ['고인', '상주'] : ['주인공', '관련인'];
           suggestedNames = names.map((n: string, i: number) => ({ name: n, label: `${roles[i] || '기타'} · ${n}` }));
-          targetName = names[0]; // 첫 번째 이름을 기본값으로
+          targetName = names[0];
         }
       }
-      // 방어 코드: account에 콤마로 여러 계좌가 합쳐진 경우
+
       let account = parsed.account || '';
       let suggestedAccounts = parsed.suggestedAccounts || [];
       if (account.includes(',') && (!Array.isArray(suggestedAccounts) || suggestedAccounts.length === 0)) {
@@ -452,135 +334,128 @@ export default function HomeTab() {
           account = accts[0];
         }
       }
-      const finalData = { ...parsed, targetName, suggestedNames, account, suggestedAccounts, date: normalizedDate, amount: parsed.amount || amt, recommendationReason: reason, type: parsed.type || 'EXPENSE', isIncome: parsed.type === 'INCOME', relation: parsed.relation || '친구' };
-      setParsedData(finalData); setInitialParsedData(finalData); setShowBottomSheet(true);
+
+      const finalData: Partial<EventEntry> = {
+        ...parsed,
+        targetName,
+        suggestedNames,
+        account,
+        suggestedAccounts,
+        date: normalizedDate,
+        amount: parsed.amount || amt,
+        recommendationReason: reason,
+        type: parsed.type || 'EXPENSE',
+        isIncome: parsed.type === 'INCOME',
+        relation: parsed.relation || '친구',
+      };
+
+      setFormData(finalData);
+      setInitialFormData(finalData);
+      setShowAiSheet(false);
+      setAiInputUrl('');
+      setAiSelectedImage(null);
+      toast.success('AI 분석 완료! 내용을 확인해주세요.', { duration: 2000, icon: <Sparkles size={16} /> });
     } catch (err: any) {
-      toast.error(`저장 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
-      setSelectedImage(null); setInputUrl(''); setInputText('');
+      toast.error(`분석 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
+      setAiSelectedImage(null);
+      setAiInputUrl('');
     } finally {
       setIsParsing(false);
-      // 성공/실패/환불 어떤 경로든 서버 잔고와 UI 배지를 반드시 맞춘다.
       refreshCredits();
     }
   };
 
-  const handleManualEntry = () => {
-    const d: any = { targetName: '', date: format(new Date(), 'yyyy-MM-dd'), eventType: 'other', location: '', relation: '', amount: 0, type: 'EXPENSE', isIncome: false, memo: '' };
-    setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null);
-    setParsedData(d); setInitialParsedData(null); setShowBottomSheet(true);
-  };
-
-
-  const handleSave = async (fd: any) => {
-    if (initialParsedData && JSON.stringify(initialParsedData) !== JSON.stringify(fd)) addFeedback(initialParsedData, fd);
+  const handleSave = async () => {
+    if (!formData.targetName?.trim()) {
+      toast.error('이름을 입력해주세요.', { duration: 2000, icon: <AlertCircle size={16} /> });
+      return;
+    }
+    if (initialFormData && JSON.stringify(initialFormData) !== JSON.stringify(formData)) {
+      addFeedback(initialFormData, formData);
+    }
     try {
       await addEntry({
-        contactId: fd.contactId, eventType: ['wedding', 'funeral', 'birthday', 'other'].includes(fd.eventType) ? fd.eventType : 'other',
-        type: fd.isIncome ? 'INCOME' : 'EXPENSE', date: fd.date || format(new Date(), 'yyyy-MM-dd'), location: fd.location || '', targetName: fd.targetName || '',
-        amount: Number(fd.amount) || 0, relation: fd.relation || '', isIncome: !!fd.isIncome, memo: fd.memo || '',
-        account: fd.account || '', recommendationReason: fd.recommendationReason || '', customEventName: fd.customEventName || '',
+        contactId: formData.contactId || '',
+        eventType: ['wedding', 'funeral', 'birthday', 'other'].includes(formData.eventType || '') ? formData.eventType as EventType : 'other',
+        type: formData.isIncome ? 'INCOME' : 'EXPENSE',
+        date: formData.date || format(new Date(), 'yyyy-MM-dd'),
+        location: formData.location || '',
+        targetName: formData.targetName || '',
+        amount: Number(formData.amount) || 0,
+        relation: formData.relation || '',
+        isIncome: !!formData.isIncome,
+        memo: formData.memo || '',
+        account: formData.account || '',
+        recommendationReason: formData.recommendationReason || '',
+        customEventName: formData.customEventName || '',
       });
       if (isAppsInToss()) {
         const { generateHapticFeedback } = await import('@apps-in-toss/web-framework');
         generateHapticFeedback({ type: 'success' });
       }
       toast.success('저장 완료!', { duration: 1800, icon: <CheckCircle2 size={16} /> });
-
-      // 계좌번호가 있으면 토스페이 송금 모달 표시
-      if (fd.account && fd.account.trim() && fd.type !== 'INCOME') {
-        setSavedAccount(fd.account);
+      if (formData.account && formData.account.trim() && formData.type !== 'INCOME') {
+        setSavedAccount(formData.account);
         setShowTransferModal(true);
       }
-      setShowBottomSheet(false); setInputText(''); setInputUrl(''); setInputMode('text'); setSelectedImage(null); setParsedData(null); setInitialParsedData(null);
+      setFormData(defaultFormData());
+      setInitialFormData(null);
     } catch (err: any) {
-      console.error('Save failed:', err);
       toast.error(`저장 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
     }
   };
 
-  const recentEntries = displayEntries.slice(0, 3);
-  const activeInputValue = inputMode === 'url' ? inputUrl : inputText;
-  const tourSampleUrl = 'https://wedding.example.com/minji-junho';
-  const displayInputValue = tour.isActive && tour.isStep(2) ? tourSampleUrl : activeInputValue;
-  const greetingName = tossUserName?.trim() ? `${tossUserName.trim().replace(/님$/, '')}님` : '손님';
-  const canAnalyzeInput = (tour.isActive && tour.isStep(2)) || (activeInputValue.trim().length > 0 && !isParsing);
-  const handleUrlMode = () => {
-    if (inputMode === 'url') {
-      setInputMode('text');
-      return;
-    }
-    const candidate = inputText.trim();
-    setInputUrl(isLikelyUrl(candidate) ? candidate : '');
-    setInputMode('url');
-    setSelectedImage(null);
-  };
-  const handlePrimaryAnalyze = () => {
-    if (tour.handleTargetAction('analyze')) return;
-    const data = activeInputValue.trim();
-    if (!data) return;
-    handleParse({ type: inputMode === 'url' ? 'url' : 'text', data });
-  };
-  const isTourResultSheet = tour.isActive && tour.isStep(3, 4);
-  const visibleParsedData = isTourResultSheet ? tourResultData : parsedData;
-  const visibleInitialParsedData = isTourResultSheet ? tourResultData : initialParsedData;
-  const showReviewSheet = showBottomSheet || isTourResultSheet;
-  const updateVisibleParsedData = (nextData: Partial<EventEntry>) => {
-    if (isTourResultSheet) return;
-    setParsedData(nextData);
-  };
-  const handleReviewClose = () => {
-    if (isTourResultSheet) return;
-    setShowBottomSheet(false);
-  };
-  const handleReviewSave = () => {
-    if (!visibleParsedData) return;
-    if (tour.handleTargetAction('save')) return;
-    handleSave(visibleParsedData);
-  };
   const handleTransferClick = async () => {
-    if (tour.handleTargetAction('history')) {
-      setShowTransferModal(false);
-      router.push('/history');
-      return;
-    }
-
     try {
       await copyToClipboard(savedAccount);
       toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
       setShowTransferModal(false);
       setTimeout(async () => {
-        // 토스 앱 송금 화면으로 이동
-        try {
-          await openExternalUrl('supertoss://send');
-        } catch {
-          // 스킴 열기 실패 시 무시 (계좌번호는 이미 복사됨)
-        }
+        try { await openExternalUrl('supertoss://send'); } catch {}
       }, 300);
     } catch {
       toast.error('토스 앱을 열 수 없습니다.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
   };
 
+  const canAnalyze = !isParsing && (aiInputUrl.trim().length > 0 || !!aiSelectedImage);
+
   return (
-    <div className="pb-5" data-tour-target="home-shell">
-      <div className="px-5 pt-8 pb-3 max-[360px]:px-4">
+    <div className="pb-24">
+      {showAiOnboarding && (
+        <SlideOnboarding
+          slides={AI_SLIDES}
+          doneLabel="분석 시작하기"
+          onClose={() => {
+            localStorage.setItem(AI_ONBOARDING_KEY, 'true');
+            setShowAiOnboarding(false);
+            setShowAiSheet(true);
+          }}
+        />
+      )}
+
+      {/* 헤더 */}
+      <div className="px-5 pt-8 pb-4 max-[360px]:px-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/icon.png"
-              alt="마음정산"
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-[14px] shadow-sm"
-            />
-            <div className="min-w-0">
-              <h2 className="whitespace-nowrap text-[17px] font-black leading-tight text-gray-950">마음정산</h2>
+          <div>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/icon.png"
+                alt="마음정산"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-[10px] shadow-sm"
+              />
+              <span className="text-[17px] font-black text-gray-950">마음정산</span>
             </div>
+            <p className="mt-1 text-[13px] font-bold text-blue-500 max-[360px]:text-[12px]">
+              안녕하세요, {greetingName}
+            </p>
           </div>
           {!tossUserId && (
             <button
               type="button"
-              onClick={handleTossLogin}
+              onClick={() => router.push('/intro')}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-gray-950 px-3.5 text-[12px] font-bold text-white active:scale-[0.97] transition-all"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -589,391 +464,305 @@ export default function HomeTab() {
           )}
         </div>
 
-        <div className="mt-6 max-w-full max-[360px]:mt-5">
-          <p className="truncate whitespace-nowrap text-[14px] font-bold text-blue-500 max-[360px]:text-[13px]">안녕하세요, {greetingName}</p>
-          <h1 className="mt-2.5 whitespace-nowrap text-[22px] leading-[1.18] font-black text-gray-950 max-[360px]:text-[20px] max-[340px]:text-[19px]">
-            어떤 마음을 정산할까요?
-          </h1>
-          <p className="mt-3.5 whitespace-nowrap text-[13px] leading-relaxed font-semibold text-gray-500 max-[360px]:text-[12px] max-[340px]:text-[11px]">
-            링크·이미지·메시지를 <span className="text-blue-500">AI</span>가 정리해요.
-          </p>
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm max-[360px]:p-3" data-tour-target="input-card">
-          {selectedImage ? (
-            <div className="flex min-h-[64px] items-center gap-3">
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse">
-                <Image
-                  src="/ai-loading-icon.png"
-                  alt="AI 분석 중"
-                  width={40}
-                  height={40}
-                  className="h-full w-full object-cover"
-                />
+        {/* AI 분석 배너 버튼 */}
+        <button
+          type="button"
+          onClick={() => {
+            setHighlightAiBanner(false);
+            const seen = typeof window !== 'undefined' && localStorage.getItem(AI_ONBOARDING_KEY) === 'true';
+            if (!seen) {
+              setShowAiOnboarding(true);
+            } else {
+              setShowAiSheet(true);
+            }
+          }}
+          className={`mt-4 w-full rounded-2xl bg-blue-500 px-4 py-3.5 text-left transition-all active:scale-[0.98] ${
+            highlightAiBanner
+              ? 'ring-[3px] ring-offset-2 ring-blue-300 shadow-lg shadow-blue-300/50'
+              : 'shadow-md shadow-blue-200'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={14} className="shrink-0 text-blue-100" />
+                <span className="text-[14px] font-black text-white">AI로 초대장 분석하기</span>
               </div>
-              <div>
-                <p className="text-[13px] font-black text-blue-600">이미지 분석 중...</p>
-                <p className="mt-0.5 text-[11px] font-semibold text-blue-400">잠시만 기다려 주세요</p>
-              </div>
+              <p className="mt-0.5 text-[12px] font-semibold text-blue-100">링크·이미지·메시지를 자동으로 입력해요</p>
             </div>
-          ) : (
-            <textarea
-              value={displayInputValue}
-              onChange={(event) => {
-                if (inputMode === 'url') setInputUrl(event.target.value);
-                else setInputText(event.target.value);
-              }}
-              placeholder={inputMode === 'url' ? '청첩장 또는 부고장 URL을 붙여넣으세요...' : '이미지 또는 메시지를 입력하세요...'}
-              className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 max-[360px]:h-[68px] max-[360px]:text-[13px]"
+            <ChevronRight size={18} className="shrink-0 text-blue-200" />
+          </div>
+        </button>
+      </div>
+
+      {/* 메인 폼 */}
+      <div className="space-y-2 px-5 max-[360px]:px-4">
+        <DirectionToggle
+          value={formData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
+          onChange={(nextType) => updateFormData({ ...formData, type: nextType, isIncome: nextType === 'INCOME' })}
+        />
+
+        {/* 이름~관계 필드 묶음 */}
+        <div className="space-y-2">
+          <Field
+            label="이름"
+            type="contact"
+            value={formData.targetName}
+            ai={!!initialFormData?.targetName}
+            tone={initialFormData?.targetName ? 'blue' : 'gray'}
+            onChange={(v: string, cid?: string) => updateFormData({ ...formData, targetName: v, contactId: cid })}
+            contacts={contacts}
+            suggestedNames={(formData as any).suggestedNames || []}
+          />
+
+          <ReviewDateField
+            label="날짜"
+            value={formData.date}
+            ai={!!initialFormData?.date}
+            onChange={(v: string) => updateFormData({ ...formData, date: v })}
+          />
+
+          <EventTypeSelector
+            value={(formData.eventType || 'other') as EventType}
+            ai={!!initialFormData?.eventType}
+            initialValue={initialFormData?.eventType as EventType | undefined}
+            onChange={(v: EventType) => updateFormData({ ...formData, eventType: v })}
+          />
+
+          {formData.eventType === 'other' && (
+            <Field
+              label="행사명"
+              placeholder="돌잔치, 개업식 등"
+              value={formData.customEventName}
+              ai={!!initialFormData?.customEventName}
+              tone={initialFormData?.customEventName ? 'blue' : 'gray'}
+              onChange={(v: string) => updateFormData({ ...formData, customEventName: v })}
             />
           )}
 
-          <div className="mt-3 flex items-center gap-1 max-[360px]:gap-0.5">
-            <button
-              type="button"
-              onClick={handleCameraCapture}
-              aria-label="카메라로 촬영"
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
-            >
-              <Camera size={14} className="shrink-0" />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">카메라</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleAlbumSelect}
-              aria-label="앨범에서 선택"
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
-            >
-              <ImageIcon size={14} className="shrink-0" />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">앨범</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleUrlMode}
-              aria-label="URL 입력"
-              className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px] ${inputMode === 'url' ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}`}
-            >
-              <LinkIcon size={14} className="shrink-0" />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">URL</span>
-            </button>
-            <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200 max-[360px]:hidden" />
-            <button
-              type="button"
-              onClick={handleManualEntry}
-              aria-label="직접 입력"
-              className="flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-gray-600 active:scale-95 transition-all max-[360px]:gap-0.5 max-[360px]:px-0 max-[360px]:text-[10px]"
-            >
-              <Plus size={14} className="shrink-0" />
-              <span className="whitespace-nowrap break-keep leading-none max-[420px]:sr-only">직접</span>
-            </button>
-            <button
-              type="button"
-              onClick={handlePrimaryAnalyze}
-              disabled={!canAnalyzeInput}
-              data-tour-target="ai-analyze-button"
-              className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 max-[360px]:ml-0 ${
-                canAnalyzeInput ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-gray-200 text-gray-400'
-              }`}
-              aria-label="AI 분석"
-            >
-              {isParsing ? <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Send size={16} />}
-            </button>
-            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-          </div>
+          <Field
+            label="장소"
+            value={formData.location}
+            ai={!!initialFormData?.location}
+            tone={initialFormData?.location ? 'blue' : 'gray'}
+            fitToWidth
+            minFitFontSize={12}
+            maxFitFontSize={14}
+            onChange={(v: string) => updateFormData({ ...formData, location: v })}
+          />
+
+          <Field
+            label="관계"
+            value={formData.relation}
+            onChange={(v: string) => updateFormData({ ...formData, relation: v })}
+          />
         </div>
 
+        <div>
+          <AmountReviewCard
+            amount={formData.amount}
+            reason={formData.recommendationReason}
+            onChange={(amount: number) => updateFormData({ ...formData, amount })}
+          />
+        </div>
+
+        <AccountReviewCard
+          account={formData.account || ''}
+          ai={!!initialFormData?.account}
+          suggestedAccounts={(formData as any).suggestedAccounts || []}
+          onChange={(account: string) => updateFormData({ ...formData, account })}
+          onCopy={async (account: string) => {
+            try {
+              await copyToClipboard(account);
+              toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
+            } catch {
+              toast.error('복사 실패', { duration: 2500, icon: <AlertCircle size={16} /> });
+            }
+          }}
+        />
+
+        <Field
+          label="메모"
+          type="textarea"
+          placeholder="필요한 내용만 적어두세요"
+          value={formData.memo || ''}
+          onChange={(v: string) => updateFormData({ ...formData, memo: v })}
+        />
+
+        {/* 저장 버튼 */}
+        <div className="pt-2 pb-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!formData.targetName?.trim()}
+            className={`h-14 w-full rounded-2xl text-[16px] font-black transition-all active:scale-[0.98] ${
+              !formData.targetName?.trim()
+                ? 'bg-gray-100 text-gray-300'
+                : 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+            }`}
+          >
+            저장하기
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-6 px-5 max-[360px]:space-y-5 max-[360px]:px-4" data-tour-target="home-reflected">
-        <section>
-          <div className="mb-2.5 flex items-center justify-between">
-            <h3 className="text-[14px] font-black text-gray-800">
-              <span className="text-blue-600">이번 달</span> 마음정산
-            </h3>
-            <button
-              type="button"
-              onClick={() => router.push('/stats')}
-              className="flex items-center gap-0.5 text-[12px] font-bold text-gray-400 active:scale-95 transition-all"
-            >
-              <span>전체 통계</span>
-              <ChevronRight size={13} />
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2.5 max-[360px]:gap-1.5">
-            <SummaryTile
-              label="받은 마음"
-              value={formatAmountMan(monthReceived)}
-              suffix=""
-              tone="blue"
-              onClick={() => setMonthEntryFilter('INCOME')}
-            />
-            <SummaryTile
-              label="보낸 마음"
-              value={formatAmountMan(monthGiven)}
-              suffix=""
-              tone="red"
-              onClick={() => setMonthEntryFilter('EXPENSE')}
-            />
-            <SummaryTile
-              label="합계"
-              value={formatSignedAmountMan(monthBalance)}
-              suffix=""
-              tone={monthBalance === 0 ? 'gray' : monthBalance > 0 ? 'blue' : 'red'}
-              onClick={() => setMonthEntryFilter('ALL')}
-            />
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-2.5 flex items-center justify-between">
-            <h3 className="text-[14px] font-black text-gray-800">최근 내역</h3>
-            <button
-              type="button"
-              onClick={() => router.push('/history')}
-              className="flex items-center gap-0.5 text-[12px] font-bold text-gray-400 active:scale-95 transition-all"
-            >
-              <span>모두 보기</span>
-              <ChevronRight size={13} />
-            </button>
-          </div>
-          {recentEntries.length > 0 ? (
-            <div className="overflow-hidden rounded-[20px] bg-white shadow-sm border border-gray-100">
-              {recentEntries.map((entry, index) => (
-                <RecentEntryRow
-                  key={entry.id}
-                  entry={entry}
-                  isLast={index === recentEntries.length - 1}
-                  onClick={() => setSelectedEntry(entry)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[20px] border border-dashed border-gray-200 bg-white px-5 py-6 text-center">
-              <p className="text-[13px] font-bold text-gray-500">아직 기록된 마음이 없어요</p>
-              <p className="mt-1 text-[11px] text-gray-400">링크·이미지·메시지로 첫 기록을 남겨보세요</p>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Bottom Sheet */}
+      {/* AI 분석 바텀시트 */}
       <AnimatePresence>
-        {showReviewSheet && visibleParsedData && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleReviewClose} className="fixed inset-0 bg-black/40 z-[60]" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }} className="fixed bottom-0 left-1/2 z-[70] flex max-h-[94dvh] w-full max-w-[430px] -translate-x-1/2 flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl">
-              <div className="shrink-0 border-b border-gray-100 bg-white px-5 pb-3 pt-2 max-[360px]:px-4">
-                <div className="w-14 h-1 bg-gray-300 rounded-full mx-auto mb-3.5" />
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-black text-blue-600">
-                      <Sparkles size={12} />
-                      <span>{visibleInitialParsedData ? 'AI 분석 완료' : '직접 입력'}</span>
-                    </div>
-                    <h3 className="mt-1.5 break-keep text-[20px] leading-tight font-black text-gray-950 max-[360px]:text-[18px]">
-                      {visibleInitialParsedData ? '내용을 확인해주세요' : '내용을 입력해주세요'}
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleReviewClose}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-all"
-                    aria-label="닫기"
-                  >
-                    <CloseIcon size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden bg-white px-3 py-2.5 no-scrollbar max-[360px]:px-2.5">
-                <DirectionToggle
-                  value={visibleParsedData.type === 'INCOME' ? 'INCOME' : 'EXPENSE'}
-                  onChange={(nextType) => updateVisibleParsedData({...visibleParsedData, type: nextType, isIncome: nextType === 'INCOME'})}
-                />
-
-                <div data-tour-target="result-info" className="space-y-2">
-                  <Field
-                    label="이름"
-                    type="contact"
-                    value={visibleParsedData.targetName}
-                    ai={!!visibleInitialParsedData?.targetName}
-                    tone={visibleInitialParsedData?.targetName ? 'blue' : 'gray'}
-                    onChange={(v: string, cid?: string) => updateVisibleParsedData({...visibleParsedData, targetName: v, contactId: cid})}
-                    contacts={contacts}
-                    suggestedNames={(visibleParsedData as any).suggestedNames || []}
-                  />
-
-                  <ReviewDateField
-                    label="날짜"
-                    value={visibleParsedData.date}
-                    ai={!!visibleInitialParsedData?.date}
-                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, date: v})}
-                  />
-
-                  <EventTypeSelector
-                    value={(visibleParsedData.eventType || 'other') as EventType}
-                    ai={!!visibleInitialParsedData?.eventType}
-                    initialValue={visibleInitialParsedData?.eventType as EventType | undefined}
-                    onChange={(v: EventType) => updateVisibleParsedData({...visibleParsedData, eventType: v})}
-                  />
-
-                  {visibleParsedData.eventType === 'other' && (
-                    <Field
-                      label="행사명"
-                      placeholder="돌잔치, 개업식 등"
-                      value={visibleParsedData.customEventName}
-                      ai={!!visibleInitialParsedData?.customEventName}
-                      tone={visibleInitialParsedData?.customEventName ? 'blue' : 'gray'}
-                      onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, customEventName: v})}
-                    />
-                  )}
-
-                  <Field
-                    label="장소"
-                    value={visibleParsedData.location}
-                    ai={!!visibleInitialParsedData?.location}
-                    tone={visibleInitialParsedData?.location ? 'blue' : 'gray'}
-                    fitToWidth
-                    minFitFontSize={12}
-                    maxFitFontSize={14}
-                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, location: v})}
-                  />
-
-                  <Field
-                    label="관계"
-                    value={visibleParsedData.relation}
-                    onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, relation: v})}
-                  />
-                </div>
-
-                <div data-tour-target="amount-card">
-                  <AmountReviewCard
-                    amount={visibleParsedData.amount}
-                    reason={visibleParsedData.recommendationReason}
-                    onChange={(amount: number) => updateVisibleParsedData({...visibleParsedData, amount})}
-                  />
-                </div>
-
-                <AccountReviewCard
-                  account={visibleParsedData.account || ''}
-                  ai={!!visibleInitialParsedData?.account}
-                  suggestedAccounts={(visibleParsedData as any).suggestedAccounts || []}
-                  onChange={(account: string) => updateVisibleParsedData({...visibleParsedData, account})}
-                  onCopy={async (account: string) => {
-                    try {
-                      await copyToClipboard(account);
-                      toast.success('계좌번호가 복사되었습니다', { duration: 1600, icon: <Copy size={16} /> });
-                    } catch {
-                      toast.error('복사 실패', { duration: 2500, icon: <AlertCircle size={16} /> });
-                    }
-                  }}
-                />
-
-                <Field
-                  label="메모"
-                  type="textarea"
-                  placeholder="필요한 내용만 적어두세요"
-                  value={visibleParsedData.memo || ''}
-                  onChange={(v: string) => updateVisibleParsedData({...visibleParsedData, memo: v})}
-                />
-              </div>
-
-              <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-2.5 max-[360px]:px-2.5">
-                <div className="flex gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleReviewClose}
-                    className="h-12 w-20 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 active:scale-[0.98] transition-all max-[360px]:w-16"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReviewSave}
-                    disabled={!visibleParsedData.targetName?.trim()}
-                    className={`h-12 flex-1 rounded-xl text-base font-black active:scale-[0.98] transition-all max-[360px]:text-[15px] ${!visibleParsedData.targetName?.trim() ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-200'}`}
-                  >
-                    저장하기
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {monthEntryFilter && (
+        {showAiSheet && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setMonthEntryFilter(null)}
-              className="fixed inset-0 z-[80] bg-black/40"
+              onClick={() => { if (!isParsing) setShowAiSheet(false); }}
+              className="fixed inset-0 bg-black/40 z-[60]"
             />
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-              className="fixed bottom-0 left-1/2 z-[90] flex max-h-[82dvh] w-full max-w-[430px] -translate-x-1/2 flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl"
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={{ top: 0, bottom: 0.3 }}
+              onDragEnd={(_, { offset, velocity }) => {
+                if (offset.y > 80 || velocity.y > 500) setShowAiSheet(false);
+              }}
+              className="fixed bottom-0 left-1/2 z-[70] w-full max-w-[430px] -translate-x-1/2 overflow-hidden rounded-t-[32px] bg-white shadow-2xl"
+              style={{ touchAction: 'none' }}
             >
-              <div className="shrink-0 border-b border-gray-100 px-5 pb-4 pt-2">
-                <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-gray-300" />
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-black text-blue-600">이번 달 경조사 내역</p>
-                    <h3 className="mt-1 text-[19px] font-black leading-tight text-gray-950">{monthSheetTitle}</h3>
-                    <p className={`mt-1 text-[14px] font-black tabular-nums ${monthSheetTone}`}>{monthSheetAmount}</p>
+              <div className="px-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-2 max-[360px]:px-4">
+                <div className="mx-auto mb-4 h-1 w-12 cursor-grab rounded-full bg-gray-300 active:cursor-grabbing" />
+
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-blue-600">
+                      <Sparkles size={14} />
+                      <span className="text-[13px] font-black">AI 분석</span>
+                    </div>
+                    <h3 className="mt-1 text-[20px] font-black leading-tight text-gray-950 max-[360px]:text-[18px]">
+                      초대장을 분석할게요
+                    </h3>
+                    <p className="mt-1 text-[13px] font-semibold text-gray-400">링크·이미지·메시지로 자동 입력해요</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setMonthEntryFilter(null)}
+                    onClick={() => { if (!isParsing) setShowAiSheet(false); }}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-all"
                     aria-label="닫기"
                   >
                     <CloseIcon size={20} />
                   </button>
                 </div>
-              </div>
 
-              <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-3 no-scrollbar">
-                {visibleMonthEntries.length > 0 ? (
-                  <div className="overflow-hidden rounded-[20px] border border-gray-100 bg-white shadow-sm">
-                    {visibleMonthEntries.map((entry, index) => (
-                      <RecentEntryRow
-                        key={entry.id}
-                        entry={entry}
-                        isLast={index === visibleMonthEntries.length - 1}
-                        onClick={() => setSelectedEntry(entry)}
-                      />
-                    ))}
+                {/* URL 입력 */}
+                {aiSelectedImage ? (
+                  <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/80 px-4 py-3.5">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[14px] animate-pulse bg-blue-100 flex items-center justify-center">
+                      <Sparkles size={18} className="text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-black text-blue-600">이미지 선택 완료</p>
+                      <button
+                        type="button"
+                        onClick={() => setAiSelectedImage(null)}
+                        className="mt-0.5 text-[11px] font-semibold text-gray-400 underline"
+                      >
+                        다시 선택
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="rounded-[20px] border border-dashed border-gray-200 bg-white px-5 py-8 text-center">
-                    <p className="text-[13px] font-bold text-gray-500">이번 달 내역이 없어요</p>
-                    <p className="mt-1 text-[11px] text-gray-400">기록을 추가하면 여기에서 바로 확인할 수 있어요</p>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <textarea
+                      value={aiInputUrl}
+                      onChange={(e) => setAiInputUrl(e.target.value)}
+                      placeholder="청첩장 또는 부고장 URL을 붙여넣으세요..."
+                      className="h-[72px] w-full resize-none bg-transparent text-sm font-semibold leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 max-[360px]:text-[13px]"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                    />
                   </div>
                 )}
+
+                {/* 이미지 버튼 */}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCameraCapture}
+                    disabled={isParsing}
+                    className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white text-[12px] font-black text-gray-600 active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    <Camera size={15} />
+                    <span>카메라</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAlbumSelect}
+                    disabled={isParsing}
+                    className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white text-[12px] font-black text-gray-600 active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    <ImageIcon size={15} />
+                    <span>앨범</span>
+                  </button>
+                </div>
+
+                {/* 분석 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => handleAiParse()}
+                  disabled={!canAnalyze}
+                  className={`mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black transition-all active:scale-[0.98] ${
+                    canAnalyze
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                      : 'bg-gray-100 text-gray-300'
+                  }`}
+                >
+                  {isParsing ? (
+                    <>
+                      <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      <span>분석 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      <span>분석하기</span>
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
       {/* 토스페이 송금 모달 */}
       <AnimatePresence>
         {showTransferModal && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTransferModal(false)} className="fixed inset-0 bg-black/40 z-[80]" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[360px] bg-white rounded-3xl p-6 z-[90] shadow-2xl">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, { offset, velocity }) => {
+                if (Math.abs(offset.y) > 60 || Math.abs(velocity.y) > 400) setShowTransferModal(false);
+              }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[360px] bg-white rounded-3xl p-6 z-[90] shadow-2xl"
+              style={{ touchAction: 'none' }}
+            >
               <div className="text-center space-y-4">
                 <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto">
                   <Wallet size={28} className="text-blue-500" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-gray-900">토스페이로 송금</h3>
-                  <p className="text-sm text-gray-400 mt-1">계좌번호가 복사됩니다.<br/>토스 앱에서 붙여넣기로 송금하세요</p>
+                  <p className="text-sm text-gray-400 mt-1">계좌번호가 복사됩니다.<br />토스 앱에서 붙여넣기로 송금하세요</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-1">계좌번호</p>
@@ -983,12 +772,7 @@ export default function HomeTab() {
                   <button onClick={() => setShowTransferModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm active:scale-95 transition-all">
                     닫기
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleTransferClick}
-                    data-tour-target="toss-transfer-button"
-                    className="flex-[2] py-3.5 bg-blue-500 text-white rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-blue-200"
-                  >
+                  <button type="button" onClick={handleTransferClick} className="flex-[2] py-3.5 bg-blue-500 text-white rounded-xl font-bold text-sm active:scale-95 transition-all shadow-lg shadow-blue-200">
                     토스로 송금하기
                   </button>
                 </div>
@@ -1003,65 +787,9 @@ export default function HomeTab() {
         onClose={() => setAdPromptOpen(false)}
         rewardType="AI_CREDIT"
       />
-      <EntryEditSheet entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
+
+      <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
     </div>
-  );
-}
-
-function SummaryTile({ label, value, suffix, tone, onClick }: { label: string; value: string; suffix: string; tone: 'blue' | 'red' | 'gray'; onClick: () => void }) {
-  const toneClass = tone === 'blue'
-    ? { text: 'text-blue-600' }
-    : tone === 'gray'
-    ? { text: 'text-gray-500' }
-    : { text: 'text-red-500' };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="min-w-0 rounded-2xl border border-gray-100 bg-white px-2.5 py-3 text-left shadow-sm transition-all active:scale-[0.98] active:bg-gray-50 max-[360px]:px-2"
-    >
-      <p className="whitespace-nowrap text-[10px] font-bold text-gray-400 max-[360px]:text-[9px]">{label}</p>
-      <p className={`mt-2.5 whitespace-nowrap text-[16px] leading-none font-black tabular-nums max-[360px]:text-[14px] ${toneClass.text}`}>
-        {value}<span className="text-[10px] font-bold text-gray-500">{suffix}</span>
-      </p>
-    </button>
-  );
-}
-
-function RecentEntryRow({ entry, isLast, onClick }: { entry: EventEntry; isLast: boolean; onClick: () => void }) {
-  const isIncome = entry.type === 'INCOME';
-  const amountLabel = `${isIncome ? '+' : '-'}${formatAmountMan(entry.amount)}`;
-  const detailLabel = entry.eventType === 'other' && entry.customEventName ? entry.customEventName : eventLabel(entry.eventType);
-  const hasMemo = !!entry.memo?.trim();
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-gray-50 max-[360px]:px-3 ${!isLast ? 'border-b border-gray-100' : ''}`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isIncome ? 'bg-blue-50' : 'bg-red-50'}`}>
-          {eventIcon(entry.eventType, 14)}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-tight text-gray-900 max-[360px]:text-[13px]">{entry.targetName || '이름 없음'}</p>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1">
-            <p className="min-w-0 truncate text-[10px] font-medium text-gray-400">{detailLabel} · {formatEntryDate(entry.date)}</p>
-            {hasMemo && (
-              <span aria-label="메모 있음" title="메모 있음" className="inline-flex shrink-0 text-blue-400">
-                <StickyNote size={11} />
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className={`text-sm font-black leading-tight max-[360px]:text-[13px] ${isIncome ? 'text-blue-600' : 'text-red-500'}`}>{amountLabel}</p>
-        <p className="mt-0.5 text-[9px] font-medium text-gray-300">{isIncome ? '받음' : '보냄'}</p>
-      </div>
-    </button>
   );
 }
 
@@ -1188,9 +916,7 @@ function AmountReviewCard({ amount, reason, onChange }: { amount?: number; reaso
             type="text"
             inputMode="decimal"
             value={displayValue}
-            onChange={(e) => {
-              onChange(parseManInputToWon(e.target.value));
-            }}
+            onChange={(e) => onChange(parseManInputToWon(e.target.value))}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
@@ -1297,14 +1023,12 @@ function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChan
 
 function Field({ label, value, onChange, type = 'text', options = [], ai = false, contacts = [], placeholder = '', suggestedNames = [], tone, fitToWidth = false, minFitFontSize = 12, maxFitFontSize = 14 }: any) {
   const [show, setShow] = useState(false);
-  // Local state + DOM ref to prevent Korean IME composition leaking across fields
   const [localValue, setLocalValue] = useState(value ?? '');
   const [fitFontSize, setFitFontSize] = useState<number | null>(null);
   const [fitRows, setFitRows] = useState(1);
   const composingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
-  // Sync from parent (AI suggestions, chip clicks, etc.) — skip during composition
   React.useEffect(() => {
     if (!composingRef.current) {
       setLocalValue(value ?? '');
@@ -1315,7 +1039,6 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
     extra?.();
     const clean = value ?? '';
     setLocalValue(clean);
-    // Force DOM cleanup after stale IME events settle
     setTimeout(() => {
       if (inputRef.current && inputRef.current.value !== clean) {
         inputRef.current.value = clean;
@@ -1334,12 +1057,9 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const v = e.target.value;
     setLocalValue(v);
-    if (!composingRef.current) {
-      onChange(v);
-    }
+    if (!composingRef.current) onChange(v);
   }, [onChange]);
 
-  // suggestedNames를 정규화: string | {name, label} 둘 다 지원
   const normalizedSuggestions: { name: string; label: string }[] = suggestedNames
     .map((s: any) => typeof s === 'string' ? { name: s, label: s } : { name: s.name, label: s.label || s.name })
     .filter((s: any) => s.name);
@@ -1356,19 +1076,12 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
 
     const fit = () => {
       const text = String(element.value || placeholder || '');
-      if (!text.trim()) {
-        setFitFontSize(null);
-        setFitRows(1);
-        return;
-      }
-
+      if (!text.trim()) { setFitFontSize(null); setFitRows(1); return; }
       const availableWidth = element.clientWidth;
       if (availableWidth <= 0) return;
-
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-
       const computed = window.getComputedStyle(element);
       ctx.font = `${computed.fontStyle} ${computed.fontVariant} ${computed.fontWeight} ${maxFitFontSize}px ${computed.fontFamily}`;
       const measuredWidth = ctx.measureText(text).width;
@@ -1376,7 +1089,6 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
         ? Math.max(minFitFontSize, Math.floor((availableWidth / measuredWidth) * maxFitFontSize * 10) / 10)
         : maxFitFontSize;
       const minWidth = measuredWidth * (minFitFontSize / maxFitFontSize);
-
       setFitFontSize(nextFontSize);
       setFitRows(nextFontSize <= minFitFontSize + 0.1 && minWidth > availableWidth ? 2 : 1);
     };
@@ -1392,21 +1104,21 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
       <div className={`rounded-2xl border px-3.5 py-3 max-[360px]:px-2.5 ${fieldClass}`}>
         <div className={`flex min-h-6 gap-2.5 max-[360px]:gap-2 ${type === 'textarea' ? 'items-start' : 'items-center'}`}>
           <label className={`w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8 ${type === 'textarea' ? 'pt-0.5' : ''}`}>{label}</label>
-      {type === 'select' ? (
+          {type === 'select' ? (
             <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
-          {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
-        </select>
-      ) : type === 'contact' ? (
+              {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
+            </select>
+          ) : type === 'contact' ? (
             <input ref={(node) => { inputRef.current = node; }} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
-      ) : type === 'date' ? (
+          ) : type === 'date' ? (
             <input type="date" value={value || ''} placeholder="yyyy-MM-dd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`} />
-      ) : type === 'textarea' ? (
+          ) : type === 'textarea' ? (
             <textarea ref={(node) => { inputRef.current = node; }} rows={3} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={`${inputClass} resize-none leading-relaxed font-bold`} />
-      ) : shouldAutoFit ? (
+          ) : shouldAutoFit ? (
             <textarea ref={(node) => { inputRef.current = node; }} rows={fitRows} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} style={{ fontSize: `${fitFontSize ?? maxFitFontSize}px` }} className={`${inputClass} resize-none overflow-hidden`} />
-      ) : (
+          ) : (
             <input ref={(node) => { inputRef.current = node; }} type={type} value={localValue} placeholder={placeholder} onFocus={handleFocus()} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
-      )}
+          )}
           {ai && <AiPill />}
         </div>
 
