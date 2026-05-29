@@ -72,9 +72,9 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
 
         {/* 기능 소개 */}
         <div className="mt-8 space-y-2.5">
-          <FeatureRow Icon={Sparkles} color="blue" text="AI가 초대장 링크·이미지로 자동 입력해요" />
-          <FeatureRow Icon={TrendingUp} color="emerald" text="과거 기록을 분석해 금액을 추천해요" />
-          <FeatureRow Icon={Download} color="violet" text="입금 내역·CSV로 한번에 가져와요" />
+          <FeatureRow Icon={Sparkles} color="blue" text="AI가 청첩장 부고장 정보를 자동 입력해요" />
+          <FeatureRow Icon={TrendingUp} color="emerald" text="AI가 과거 기록을 분석해 금액을 추천해요" />
+          <FeatureRow Icon={Download} color="violet" text="받은 마음을 한번에 가져와 기록할 수 있어요" />
         </div>
 
         {/* 스페이서 — 화면이 충분히 크면 버튼 위 여백 확보 */}
