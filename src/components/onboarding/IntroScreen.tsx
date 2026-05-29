@@ -50,36 +50,39 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
   }, [loadFromSupabase, onComplete, router]);
 
   return (
-    <div className="fixed inset-0 z-[500] flex flex-col bg-white px-6 pb-[max(32px,env(safe-area-inset-bottom,32px))] pt-16">
-      {/* 브랜딩 */}
-      <div className="flex flex-col items-center gap-4 pt-8">
-        <Image
-          src="/icon.png"
-          alt="마음정산"
-          width={80}
-          height={80}
-          className="h-20 w-20 rounded-[24px] shadow-lg"
-        />
-        <div className="text-center">
-          <h1 className="text-[28px] font-black text-gray-950">마음정산</h1>
-          <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">
-            경조사 마음, 스마트하게 정리해요
-          </p>
+    <div className="fixed inset-0 z-[500] flex flex-col bg-white px-6 pb-[max(24px,env(safe-area-inset-bottom,24px))]">
+      {/* 스크롤 가능한 콘텐츠 영역 — 화면이 작아도 버튼은 항상 하단에 고정 */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-10">
+        {/* 브랜딩 */}
+        <div className="flex flex-col items-center gap-3 pt-4">
+          <Image
+            src="/icon.png"
+            alt="마음정산"
+            width={80}
+            height={80}
+            className="h-20 w-20 rounded-[24px] shadow-lg"
+          />
+          <div className="text-center">
+            <h1 className="text-[28px] font-black text-gray-950">마음정산</h1>
+            <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">
+              경조사 마음, 스마트하게 정리해요
+            </p>
+          </div>
         </div>
+
+        {/* 기능 소개 */}
+        <div className="mt-8 space-y-2.5">
+          <FeatureRow Icon={Sparkles} color="blue" text="AI가 초대장 링크·이미지로 자동 입력해요" />
+          <FeatureRow Icon={TrendingUp} color="emerald" text="과거 기록을 분석해 금액을 추천해요" />
+          <FeatureRow Icon={Download} color="violet" text="입금 내역·CSV로 한번에 가져와요" />
+        </div>
+
+        {/* 스페이서 — 화면이 충분히 크면 버튼 위 여백 확보 */}
+        <div className="min-h-6 flex-1" />
       </div>
 
-      {/* 기능 소개 */}
-      <div className="mt-10 space-y-3">
-        <FeatureRow Icon={Sparkles} color="blue" text="AI가 초대장 링크·이미지로 자동 입력해요" />
-        <FeatureRow Icon={TrendingUp} color="emerald" text="과거 기록을 분석해 금액을 추천해요" />
-        <FeatureRow Icon={Download} color="violet" text="입금 내역·CSV로 한번에 가져와요" />
-      </div>
-
-      {/* 스페이서 */}
-      <div className="flex-1" />
-
-      {/* 로그인 버튼 */}
-      <div className="space-y-3">
+      {/* 하단 고정 버튼 */}
+      <div className="shrink-0 space-y-3 pt-3">
         <button
           type="button"
           onClick={handleLogin}
