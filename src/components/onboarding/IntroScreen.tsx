@@ -119,7 +119,7 @@ function FeatureRow({
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorMap[color]}`}>
         <Icon size={18} />
       </span>
-      <span className="text-[14px] font-semibold text-gray-700">{text}</span>
+      <span className="text-[clamp(12px,3.5vw,14px)] font-semibold text-gray-700">{text}</span>
     </div>
   );
 }
