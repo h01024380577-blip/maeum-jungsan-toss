@@ -8,8 +8,8 @@ const TEST_REWARDED_AD_GROUP_ID = 'ait-ad-test-rewarded-id';
 
 export const CREDITS_CONFIG = {
   ai: {
-    welcome: Number(process.env.AI_CREDIT_WELCOME ?? 3),
-    cap: Number(process.env.AI_CREDIT_CAP ?? 5),
+    welcome: Number(process.env.AI_CREDIT_WELCOME ?? 1),
+    cap: Number(process.env.AI_CREDIT_CAP ?? 3),
     rewardAmount: Number(process.env.AI_CREDIT_REWARD_AMOUNT ?? 1),
     guardEnabled: process.env.AI_CREDIT_GUARD_ENABLED === 'true',
   },

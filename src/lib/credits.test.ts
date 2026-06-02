@@ -7,8 +7,11 @@ import {
 } from './credits';
 
 describe('credits config', () => {
-  it('starts new users with 3 AI credits so reward ads are immediately available below cap', () => {
-    expect(CREDITS_CONFIG.ai.welcome).toBe(3);
+  it('starts new users with 1 AI credit and keeps the AI reward cap aligned with bulk imports', () => {
+    expect(CREDITS_CONFIG.ai.welcome).toBe(1);
+    expect(CREDITS_CONFIG.csv.welcome).toBe(1);
+    expect(CREDITS_CONFIG.ai.cap).toBe(3);
+    expect(CREDITS_CONFIG.csv.cap).toBe(3);
     expect(CREDITS_CONFIG.ai.welcome).toBeLessThan(CREDITS_CONFIG.ai.cap);
   });
 });

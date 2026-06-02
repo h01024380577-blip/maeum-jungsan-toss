@@ -469,7 +469,7 @@ function slide05() {
     ${text('AI 분석', 174, 583, { size: 12, weight: 900, fill: palette.blueDark })}
     ${text('3', 150, 630, { size: 36, weight: 900, fill: palette.blueDark })}
     ${text('회', 193, 630, { size: 14, weight: 900, fill: palette.blueDark })}
-    ${text('최대 5회 보관', 150, 652, { size: 10, weight: 800, fill: palette.muted })}
+    ${text('최대 3회 보관', 150, 652, { size: 10, weight: 800, fill: palette.muted })}
     ${rect(150, 662, 120, 24, 9, palette.blue)}
     ${text('광고 보고 +1회', 210, 679, { size: 11, weight: 900, fill: '#FFFFFF', anchor: 'middle' })}
     ${rect(326, 550, 184, 126, 20, palette.violetSoft)}

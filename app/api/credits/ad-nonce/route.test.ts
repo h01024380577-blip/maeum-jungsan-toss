@@ -15,7 +15,7 @@ vi.mock('@/src/lib/prisma', () => ({
 
 vi.mock('@/src/lib/credits', () => ({
   CREDITS_CONFIG: {
-    ai: { cap: 5, rewardAmount: 1 },
+    ai: { cap: 3, rewardAmount: 1 },
     csv: { cap: 3, rewardAmount: 1 },
     ad: { dailyLimit: 10, nonceTtlMs: 5 * 60 * 1000, activeNonceLimit: 3 },
   },
@@ -77,6 +77,23 @@ describe('/api/credits/ad-nonce POST', () => {
 
     expect(response.status).toBe(429);
     expect(json).toEqual({ error: 'active_nonce_limit' });
+    expect(prisma.adRewardGrant.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects AI reward ad issuance when the balance is already at the AI cap', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      aiCredits: 3,
+      csvImportCredits: 1,
+    } as any);
+
+    const response = await POST(makeRequest({
+      rewardType: 'AI_CREDIT',
+      adGroupId: 'ait.valid.rewarded',
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(json).toEqual({ error: 'cap_reached_ai' });
     expect(prisma.adRewardGrant.create).not.toHaveBeenCalled();
   });
 });

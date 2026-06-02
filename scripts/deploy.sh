@@ -30,6 +30,7 @@ npx prisma db execute --file prisma/manual-migrations/2026-05-11_clear_generated
 npx prisma db execute --file prisma/manual-migrations/2026-05-15_add_user_session_version.sql --url \"\$DIRECT_URL\"
 npx prisma db execute --file prisma/manual-migrations/2026-05-15_add_payment_order.sql --url \"\$DIRECT_URL\"
 npx prisma db execute --file prisma/manual-migrations/2026-05-18_set_ai_credit_default_3.sql --url \"\$DIRECT_URL\"
+npx prisma db execute --file prisma/manual-migrations/2026-06-02_align_ai_credit_defaults.sql --url \"\$DIRECT_URL\"
 npx prisma generate
 NODE_OPTIONS=--max-old-space-size=1024 npm run build:next 2>&1 | tail -3
 pm2 restart maeum-jungsan --update-env'"

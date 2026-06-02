@@ -87,7 +87,7 @@ interface AppState {
 }
 
 const createInitialCredits = (): CreditsState => ({
-  ai: { balance: 0, cap: 5, canWatchAd: false },
+  ai: { balance: 0, cap: 3, canWatchAd: false },
   csv: { balance: 0, cap: 3, canWatchAd: false },
   ad: { watchesRemaining: 0, dailyLimit: 10, resetAt: null },
   loaded: false,

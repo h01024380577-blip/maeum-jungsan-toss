@@ -29,7 +29,7 @@ describe('useStore clearData', () => {
       tossUserName: '민수',
       notificationsEnabled: true,
       credits: {
-        ai: { balance: 3, cap: 5, canWatchAd: true },
+        ai: { balance: 3, cap: 3, canWatchAd: true },
         csv: { balance: 2, cap: 3, canWatchAd: true },
         ad: {
           watchesRemaining: 4,
@@ -57,7 +57,7 @@ describe('useStore clearData', () => {
     expect(state.tossUserName).toBeNull();
     expect(state.notificationsEnabled).toBe(false);
     expect(state.credits).toEqual({
-      ai: { balance: 0, cap: 5, canWatchAd: false },
+      ai: { balance: 0, cap: 3, canWatchAd: false },
       csv: { balance: 0, cap: 3, canWatchAd: false },
       ad: { watchesRemaining: 0, dailyLimit: 10, resetAt: null },
       loaded: false,

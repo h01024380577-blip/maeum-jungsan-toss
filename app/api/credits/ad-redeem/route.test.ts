@@ -9,7 +9,7 @@ vi.mock('@/src/lib/prisma', () => ({
 
 vi.mock('@/src/lib/credits', () => ({
   CREDITS_CONFIG: {
-    ai: { cap: 5, rewardAmount: 1 },
+    ai: { cap: 3, rewardAmount: 1 },
     csv: { cap: 3, rewardAmount: 1 },
     ad: { dailyLimit: 10, nonceTtlMs: 5 * 60 * 1000, activeNonceLimit: 3 },
   },
@@ -119,6 +119,30 @@ describe('/api/credits/ad-redeem POST', () => {
 
     expect(response.status).toBe(429);
     expect(json).toEqual({ success: false, reason: 'daily_ad_limit' });
+    expect(tx.adRewardGrant.update).toHaveBeenCalledWith({
+      where: { id: 'grant-1' },
+      data: { status: 'REJECTED' },
+    });
+  });
+
+  it('rejects redeem when the AI credit balance reached the AI cap after nonce issuance', async () => {
+    const tx = makeTx({
+      user: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        findUnique: vi.fn().mockResolvedValue({
+          aiCredits: 3,
+          csvImportCredits: 0,
+          adWatchesToday: 0,
+        }),
+      },
+    });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
+
+    const response = await POST(makeRequest({ nonce: 'nonce-1' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(json).toEqual({ success: false, reason: 'cap_reached' });
     expect(tx.adRewardGrant.update).toHaveBeenCalledWith({
       where: { id: 'grant-1' },
       data: { status: 'REJECTED' },

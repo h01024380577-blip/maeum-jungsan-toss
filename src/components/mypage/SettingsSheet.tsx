@@ -193,7 +193,7 @@ export default function SettingsSheet({ open, onClose }: Props) {
                   <SettingsRow
                     Icon={Info}
                     label="버전 정보"
-                    trailing="v1.0.0"
+                    trailing="v1.0.1"
                     hideChevron
                   />
                 </div>

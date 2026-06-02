@@ -32,7 +32,7 @@ CREATE TABLE "User" (
     "tokenExpiresAt" TIMESTAMP(3),
     "scopes" TEXT,
     "notificationsEnabled" BOOLEAN NOT NULL DEFAULT false,
-    "aiCredits" INTEGER NOT NULL DEFAULT 3,
+    "aiCredits" INTEGER NOT NULL DEFAULT 1,
     "csvImportCredits" INTEGER NOT NULL DEFAULT 1,
     "adWatchesToday" INTEGER NOT NULL DEFAULT 0,
     "adWatchesResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

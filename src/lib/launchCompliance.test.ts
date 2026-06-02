@@ -80,14 +80,37 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(script).toMatch(/cleanup_server_artifacts[\s\S]+sleep\s+0\.[0-9]+[\s\S]+cleanup_server_artifacts/);
   });
 
-  it('sets the new-user AI credit default to 3 in schema and deployment migration', () => {
+  it('sets the new-user credit defaults to 1 and aligns AI cap migration with bulk imports', () => {
     const schema = read('prisma/schema.prisma');
-    const migration = read('prisma/manual-migrations/2026-05-18_set_ai_credit_default_3.sql');
+    const migration = read('prisma/manual-migrations/2026-06-02_align_ai_credit_defaults.sql');
     const deploy = read('scripts/deploy.sh');
 
-    expect(schema).toContain('aiCredits        Int      @default(3)');
+    expect(schema).toContain('aiCredits        Int      @default(1)');
+    expect(schema).toContain('csvImportCredits Int      @default(1)');
     expect(schema).not.toContain('웰컴 5회');
-    expect(migration).toContain('ALTER COLUMN "aiCredits" SET DEFAULT 3');
-    expect(deploy).toContain('2026-05-18_set_ai_credit_default_3.sql');
+    expect(migration).toContain('ALTER COLUMN "aiCredits" SET DEFAULT 1');
+    expect(migration).toContain('UPDATE "User"');
+    expect(migration).toContain('SET "aiCredits" = 3');
+    expect(migration).toContain('WHERE "aiCredits" > 3');
+    expect(migration).toContain('AI_CREDIT_CAP=3');
+    expect(deploy).toContain('2026-06-02_align_ai_credit_defaults.sql');
+  });
+
+  it('shows and packages version 1.0.1', () => {
+    const pkg = JSON.parse(read('package.json'));
+    const lock = JSON.parse(read('package-lock.json'));
+    const settings = read('src/components/mypage/SettingsSheet.tsx');
+
+    expect(pkg.version).toBe('1.0.1');
+    expect(lock.version).toBe('1.0.1');
+    expect(lock.packages[''].version).toBe('1.0.1');
+    expect(settings).toContain('trailing="v1.0.1"');
+  });
+
+  it('uses the 3-credit storage cap in onboarding image copy', () => {
+    const generator = read('scripts/generate-onboarding-images.mjs');
+
+    expect(generator).toContain("text('최대 3회 보관', 150");
+    expect(generator).not.toContain('최대 5회 보관');
   });
 });
