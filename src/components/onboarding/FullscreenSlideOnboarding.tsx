@@ -109,15 +109,28 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
       {/* 영구 크롬: 도트 + 건너뛰기 (슬라이드 전환과 무관하게 고정) */}
       <div className="shrink-0 px-6 pb-3 pt-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: CTA_INDEX + 1 }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  i === index ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-200'
-                }`}
-              />
-            ))}
+          <div className="flex items-center gap-2">
+            {index > 0 && (
+              <button
+                type="button"
+                onClick={goPrev}
+                className="flex h-7 w-7 items-center justify-center text-gray-400 active:text-gray-700"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            )}
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: CTA_INDEX + 1 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-200 ${
+                    i === index ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-200'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
           {!isCta && (
             <button
@@ -208,7 +221,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
             </div>
           ) : (
             <>
-              {/* 기능 슬라이드: 폰 프레임 + < > 버튼 */}
+              {/* 기능 슬라이드: 폰 프레임 */}
               <div className="relative min-h-0 flex-1 bg-gradient-to-b from-blue-50 via-slate-50 to-slate-100">
                 <div className="absolute inset-x-0 inset-y-3 flex items-center justify-center">
                   <div
@@ -225,32 +238,17 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
                     />
                   </div>
                 </div>
-                {/* 이전 버튼 */}
-                {index > 0 && (
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-transform active:scale-95"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="15 18 9 12 15 6" />
-                    </svg>
-                  </button>
-                )}
-                {/* 다음 버튼 */}
+              </div>
+              <div className="shrink-0 px-6 pb-[max(24px,env(safe-area-inset-bottom,24px))] pt-3">
+                <h2 className="text-[22px] font-black leading-snug text-gray-950">{slide!.title}</h2>
+                <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">{slide!.body}</p>
                 <button
                   type="button"
                   onClick={goNext}
-                  className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-blue-500 shadow-md transition-transform active:scale-95"
+                  className="mt-5 h-14 w-full rounded-2xl bg-blue-500 text-[16px] font-black text-white transition-all active:scale-[0.98]"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
+                  다음
                 </button>
-              </div>
-              <div className="shrink-0 px-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] pt-3">
-                <h2 className="text-[22px] font-black leading-snug text-gray-950">{slide!.title}</h2>
-                <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">{slide!.body}</p>
               </div>
             </>
           )}
