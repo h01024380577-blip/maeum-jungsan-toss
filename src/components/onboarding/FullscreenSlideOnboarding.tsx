@@ -47,10 +47,9 @@ const CTA_INDEX = SLIDES.length;
 
 interface FullscreenSlideOnboardingProps {
   onComplete: () => void;
-  onSkip: () => void;
 }
 
-export default function FullscreenSlideOnboarding({ onComplete, onSkip }: FullscreenSlideOnboardingProps) {
+export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlideOnboardingProps) {
   const { loadFromSupabase } = useStore();
   const [index, setIndex] = useState(0);
   const [isLogging, setIsLogging] = useState(false);
@@ -87,9 +86,8 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
   }, [loadFromSupabase, onComplete]);
 
   const handleSkip = useCallback(() => {
-    localStorage.setItem('heartbook-onboarding-seen', 'true');
-    onSkip();
-  }, [onSkip]);
+    setIndex(CTA_INDEX);
+  }, []);
 
   const slide = SLIDES[index] as Slide | undefined;
 

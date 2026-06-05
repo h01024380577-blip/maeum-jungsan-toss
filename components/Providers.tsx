@@ -58,7 +58,6 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
       {showOnboarding && (
         <FullscreenSlideOnboarding
           onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingComplete}
         />
       )}
       <Toaster
