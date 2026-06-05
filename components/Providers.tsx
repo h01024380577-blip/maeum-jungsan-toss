@@ -34,6 +34,7 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   }, [isLoaded, tossUserId]);
 
   const handleOnboardingComplete = useCallback(() => {
+    localStorage.setItem('heartbook-onboarding-seen', 'true');
     setHasSeenOnboarding(true);
   }, []);
 
