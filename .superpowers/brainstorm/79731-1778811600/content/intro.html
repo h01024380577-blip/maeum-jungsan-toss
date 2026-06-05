@@ -1,0 +1,21 @@
+<h2>금액 변경 사유 묻기 UX — 브레인스토밍</h2>
+<p class="subtitle">AI 추천 금액을 사용자가 수정하여 저장한 경우, 변경 이유를 묻는 UX를 함께 설계해요.</p>
+
+<div class="section">
+  <span class="label">현재 흐름 (HomeTab.tsx)</span>
+  <div class="mockup">
+    <div class="mockup-header">현재 저장 시 동작</div>
+    <div class="mockup-body">
+      <p>1. 청첩장 URL/사진 분석 → AI가 <code>amt</code> 추천 + <code>recommendationReason</code> 부여</p>
+      <p>2. 사용자가 바텀시트에서 <code>AmountReviewCard</code>로 금액 검토/수정</p>
+      <p>3. "저장하기" → <code>handleSave</code> → <code>addEntry</code> (DB 저장)</p>
+      <p>4. 토스트 "저장 완료!" + (계좌 있으면) 송금 모달</p>
+      <p style="color:#999;margin-top:8px">※ 현재 <code>initialParsedData</code>로 변경 여부는 추적 중이지만, 사유는 묻지 않음</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">다음 단계</span>
+  <p>터미널에서 첫 질문을 드릴게요. 시각적 비교가 필요한 단계가 오면 이 화면에서 보여드립니다.</p>
+</div>

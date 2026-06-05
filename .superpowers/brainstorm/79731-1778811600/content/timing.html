@@ -1,0 +1,78 @@
+<h2>변경 사유, 언제 어떻게 물을까요?</h2>
+<p class="subtitle">저장은 이미 완료된 상태입니다. 사유는 사후 수집이라는 전제 하에, 4가지 패턴을 비교해 보세요.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0064FF;color:white;padding:14px;border-radius:12px 12px 0 0;font-size:11px;text-align:center;font-weight:600">✓ 저장 완료!</div>
+      <div style="padding:18px;background:white;border-radius:0 0 12px 12px">
+        <div style="font-size:11px;color:#666;margin-bottom:10px">💡 추천 5만원 → 저장 8만원</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">금액이 달라진 이유를 알려주세요</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10px;padding:5px 9px;background:#f0f4ff;border-radius:14px;border:1px solid #d0dcff">친한 사이라서</span>
+          <span style="font-size:10px;padding:5px 9px;background:#f0f4ff;border-radius:14px;border:1px solid #d0dcff">예식장 격</span>
+          <span style="font-size:10px;padding:5px 9px;background:#f0f4ff;border-radius:14px;border:1px solid #d0dcff">최근 받은 만큼</span>
+        </div>
+        <div style="font-size:10px;color:#999;margin-top:10px;text-align:right">건너뛰기</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 같은 바텀시트 내 전환</h3>
+      <p>저장 직후 같은 바텀시트가 "사유 묻기" 화면으로 바뀜. 흐름 일관성↑, 사용자가 한 화면에서 완결.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:8px;font-size:10px;color:#999">홈 화면 (배경)</div>
+      <div style="background:white;border:2px solid #0064FF;border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,0.12)">
+        <div style="font-size:11px;color:#0064FF;font-weight:600;margin-bottom:6px">💬 잠깐, 알려주세요</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">추천보다 +3만원 올리셨네요</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="font-size:11px;padding:7px 10px;background:#f0f4ff;border-radius:10px;border:1px solid #d0dcff">친한 사이라서</div>
+          <div style="font-size:11px;padding:7px 10px;background:#f0f4ff;border-radius:10px;border:1px solid #d0dcff">최근 받은 만큼</div>
+          <div style="font-size:11px;padding:7px 10px;background:#f0f4ff;border-radius:10px;border:1px solid #d0dcff">기타 (직접 입력)</div>
+        </div>
+        <div style="font-size:10px;color:#999;margin-top:10px;text-align:right">건너뛰기</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 별도 모달 (저장 후 자동 등장)</h3>
+      <p>저장 토스트 후 별도 미니 모달이 떠 사유 입력 요청. 주목도↑, 답변률↑. 다만 "또 뭐 하나" 인상 줄 수 있음.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#222;color:white;padding:10px 14px;border-radius:12px;font-size:11px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span>✓ 저장 완료!</span>
+        <span style="background:#444;padding:3px 8px;border-radius:8px;font-size:10px">변경 사유 남기기</span>
+      </div>
+      <div style="background:#f5f5f5;padding:14px;border-radius:8px;font-size:10px;color:#999;text-align:center">홈 화면으로 복귀</div>
+    </div>
+    <div class="card-body">
+      <h3>C. 토스트에 액션 버튼</h3>
+      <p>저장 토스트 안에 "변경 사유 남기기" 버튼. 비차단/저강도. 답변률은 가장 낮지만 가장 매끄러움.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="d" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:white;border:1px dashed #0064FF;border-radius:12px;padding:14px;margin-bottom:8px">
+        <div style="font-size:11px;color:#0064FF;font-weight:600;margin-bottom:6px">📝 방금 저장한 기록</div>
+        <div style="font-size:11px;color:#666">홍길동 결혼식 · 8만원</div>
+        <div style="font-size:10px;color:#999;margin-top:6px">추천보다 +3만원. 이유를 적어두면 다음에 더 잘 추천해드릴게요</div>
+        <div style="margin-top:8px;background:#f0f4ff;padding:6px 10px;border-radius:14px;font-size:10px;color:#0064FF;display:inline-block">사유 입력하기 →</div>
+      </div>
+      <div style="font-size:9px;color:#999;text-align:center">최근 기록 영역 상단에 표시</div>
+    </div>
+    <div class="card-body">
+      <h3>D. 홈 화면 인라인 카드</h3>
+      <p>홈으로 돌아온 후 "최근 기록" 위에 인라인 카드로 노출. 차단 0, 사용자가 원할 때만 답변. 답변률 최저.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <p class="subtitle">💡 핵심 트레이드오프: <b>차단성↑ = 답변률↑ = 피로도↑</b>. 어느 지점이 우리 사용자에게 맞을지가 관건이에요.</p>
+</div>

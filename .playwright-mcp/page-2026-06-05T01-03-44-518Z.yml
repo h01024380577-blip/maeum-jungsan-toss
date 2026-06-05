@@ -1,0 +1,160 @@
+- generic [active] [ref=e1]:
+  - heading "온보딩 마이그레이션 — 목업" [level=1] [ref=e2]
+  - paragraph [ref=e3]: FullscreenSlideOnboarding · 5슬라이드 구성 (실제 구현 시 /onboarding/*.png 이미지 사용)
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: SLIDE 1 / 5
+      - generic [ref=e7]:
+        - generic [ref=e9]:
+          - generic [ref=e17]: "-10만"
+          - generic [ref=e23]: +5만
+          - generic [ref=e29]: "-5만"
+          - generic [ref=e35]:
+            - generic [ref=e36]: 이번 달 요약
+            - generic [ref=e37]:
+              - generic [ref=e38]:
+                - generic [ref=e39]: 보낸 마음
+                - generic [ref=e40]: 150만
+              - generic [ref=e41]:
+                - generic [ref=e42]: 받은 마음
+                - generic [ref=e43]: 80만
+        - generic [ref=e44]:
+          - button "건너뛰기" [ref=e52] [cursor=pointer]
+          - generic [ref=e53]:
+            - text: 경조사 마음,
+            - text: 한눈에 정리해요
+          - generic [ref=e54]:
+            - text: 줬다·받은 마음을 한곳에 기록하고
+            - text: 언제든 꺼내볼 수 있어요
+          - button "다음" [ref=e55] [cursor=pointer]
+    - generic [ref=e56]:
+      - generic [ref=e57]: SLIDE 2 / 5
+      - generic [ref=e58]:
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e62]: ✦ AI 분석
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - generic [ref=e65]: 이름
+                - generic [ref=e66]: 김○○ 님
+              - generic [ref=e67]:
+                - generic [ref=e68]: 날짜
+                - generic [ref=e69]: 2026년 7월 5일 (토)
+              - generic [ref=e70]:
+                - generic [ref=e71]: 장소
+                - generic [ref=e72]: ○○ 웨딩홀 3층
+          - generic [ref=e73]:
+            - generic [ref=e74]: 💡 AI 금액 추천
+            - generic [ref=e75]: 100,000원
+            - generic [ref=e76]: 친구 사이 평균적인 마음이에요
+          - generic [ref=e77]:
+            - generic [ref=e78]: 🔗
+            - generic [ref=e80]: 청첩장 링크 붙여넣기
+        - generic [ref=e82]:
+          - button "건너뛰기" [ref=e90] [cursor=pointer]
+          - generic [ref=e91]:
+            - text: 청첩장 링크 하나로
+            - text: 자동 입력돼요
+          - generic [ref=e92]:
+            - text: AI가 이름·날짜·장소를 읽어서
+            - text: 바로 채워줘요
+          - button "다음" [ref=e93] [cursor=pointer]
+    - generic [ref=e94]:
+      - generic [ref=e95]: SLIDE 3 / 5
+      - generic [ref=e96]:
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: ✦ 입금 분석
+              - generic [ref=e102]: 3건 발견됨
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - generic [ref=e105]:
+                  - generic [ref=e106]: 박○○
+                  - generic [ref=e107]: 2026.05.10
+                - generic [ref=e108]: +50,000
+              - generic [ref=e109]:
+                - generic [ref=e110]:
+                  - generic [ref=e111]: 이○○
+                  - generic [ref=e112]: 2026.05.10
+                - generic [ref=e113]: +100,000
+              - generic [ref=e114]:
+                - generic [ref=e115]:
+                  - generic [ref=e116]: 최○○
+                  - generic [ref=e117]: 2026.05.11
+                - generic [ref=e118]: +70,000
+          - generic [ref=e119]:
+            - generic [ref=e120]: 📸
+            - generic [ref=e121]:
+              - generic [ref=e122]: 입금 내역 이미지 업로드
+              - generic [ref=e123]: 카카오페이·토스 캡처 사용 가능
+        - generic [ref=e124]:
+          - button "건너뛰기" [ref=e132] [cursor=pointer]
+          - generic [ref=e133]:
+            - text: 받은 마음도
+            - text: 자동으로 정리해요
+          - generic [ref=e134]:
+            - text: 입금 내역 이미지를 올리면 AI가
+            - text: 받은 마음을 한번에 찾아줘요
+          - button "다음" [ref=e135] [cursor=pointer]
+    - generic [ref=e136]:
+      - generic [ref=e137]: SLIDE 4 / 5
+      - generic [ref=e138]:
+        - generic [ref=e140]:
+          - generic [ref=e141]:
+            - generic [ref=e142]: 관계별 지출 현황
+            - generic [ref=e143]:
+              - generic [ref=e144]:
+                - generic [ref=e145]: 가족
+                - generic [ref=e148]: 85만
+              - generic [ref=e149]:
+                - generic [ref=e150]: 친구
+                - generic [ref=e153]: 62만
+              - generic [ref=e154]:
+                - generic [ref=e155]: 동료
+                - generic [ref=e158]: 40만
+              - generic [ref=e159]:
+                - generic [ref=e160]: 지인
+                - generic [ref=e163]: 20만
+          - generic [ref=e164]:
+            - generic [ref=e165]: 연도별 총계
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]: "2024"
+                - generic [ref=e169]: 312만
+              - generic [ref=e170]:
+                - generic [ref=e171]: "2025"
+                - generic [ref=e172]: 207만
+              - generic [ref=e173]:
+                - generic [ref=e174]: "2026"
+                - generic [ref=e175]: 150만
+        - generic [ref=e176]:
+          - button "건너뛰기" [ref=e184] [cursor=pointer]
+          - generic [ref=e185]:
+            - text: 관계별 통계로
+            - text: 흐름을 파악해요
+          - generic [ref=e186]:
+            - text: 누구에게 얼마나 마음을 건넸는지
+            - text: 한눈에 볼 수 있어요
+          - button "다음" [ref=e187] [cursor=pointer]
+    - generic [ref=e188]:
+      - generic [ref=e189]: SLIDE 5 / 5 — 로그인 CTA
+      - generic [ref=e190]:
+        - generic [ref=e191]:
+          - generic [ref=e192]: 💙
+          - generic [ref=e193]: 마음정산
+          - generic [ref=e194]:
+            - text: 경조사 마음을
+            - text: 스마트하게 정리해요
+        - generic [ref=e195]:
+          - generic [ref=e203]:
+            - text: 시작할 준비가
+            - text: 됐어요
+          - generic [ref=e204]:
+            - text: 로그인하면 기록이 안전하게
+            - text: 저장돼요
+          - button "토스로 시작하기" [ref=e205] [cursor=pointer]
+  - paragraph [ref=e206]:
+    - text: 실제 구현 시 이미지 영역에
+    - code [ref=e207]: /onboarding/maeum-onboarding-*.png
+    - text: 스크린샷이 들어갑니다

@@ -1,0 +1,69 @@
+<h2>변경 이유는 어떤 방식으로 받을까요?</h2>
+<p class="subtitle">전제: 저장 성공 후 같은 바텀시트 안에서 “저장 완료” 토스트성 피드백과 이유 질문을 함께 보여줍니다.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">관계가 가까워서</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">부담을 줄이려고</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">최근 받은 금액 기준</div>
+          </div>
+          <div style="height:42px;border-radius:14px;background:#2563eb;margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 선택 칩만</h3>
+      <p>한 번 탭으로 끝나서 가장 빠릅니다. 대신 사용자의 실제 이유가 선택지 밖이면 데이터가 거칠어질 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="margin-top:14px;height:92px;border-radius:16px;background:#f8fafc;border:1px solid #e5e7eb;padding:12px;color:#94a3b8;font-size:13px;font-weight:800">예: 지난번에 7만원을 받아서 맞췄어요</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+            <div style="height:42px;border-radius:14px;background:#f1f5f9"></div>
+            <div style="height:42px;border-radius:14px;background:#2563eb"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 자유 입력만</h3>
+      <p>이유 품질은 좋지만, 저장 직후 부담이 커지고 답변율이 낮아질 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">관계가 가까워서</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">받은 금액 기준</div>
+          </div>
+          <div style="margin-top:10px;height:54px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb;padding:10px;color:#94a3b8;font-size:12px;font-weight:800">직접 입력도 가능</div>
+          <div style="height:42px;border-radius:14px;background:#2563eb;margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 선택 칩 + 선택적 직접 입력</h3>
+      <p>빠른 답변과 구체적 이유를 모두 받을 수 있습니다. UI는 조금 더 복잡하지만 가장 유연합니다.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,34 @@
+<h2>자유문장 처리 경계</h2>
+<p class="subtitle">사용자 원문은 저장하지만, 다음 추천 입력에는 그대로 넣지 않습니다. 추천에는 원문에서 추출한 구조화 prior만 사용합니다.</p>
+
+<div class="mockup">
+  <div class="mockup-header">저장되는 데이터와 추천에 들어가는 데이터</div>
+  <div class="mockup-body">
+    <div style="display:grid;gap:12px">
+      <div style="border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#6b7280">사용자 원문 저장</div>
+        <div style="font-size:13px;font-weight:800;color:#111827;margin-top:6px">이번에는 배우자랑 같이 참석해서 둘이 내는 기준으로 맞췄어.</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:6px">원문은 prior 생성의 근거로 보관하지만 다음 추천 프롬프트에는 직접 넣지 않음</div>
+      </div>
+
+      <div style="text-align:center;color:#9ca3af;font-weight:900">↓ 추출</div>
+
+      <div style="border-radius:14px;background:#ecfdf5;border:1px solid #a7f3d0;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#047857">구조화 prior</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:8px 10px;font-size:12px;font-weight:900">companion_count</span>
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:8px 10px;font-size:12px;font-weight:900">shared_attendance</span>
+        </div>
+        <div style="font-size:12px;color:#4b5563;margin-top:8px">다음 추천은 이 구조화 prior만 참고</div>
+      </div>
+
+      <div style="text-align:center;color:#9ca3af;font-weight:900">↓ 다음 추천</div>
+
+      <div style="border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#1d4ed8">recommendAmount 입력</div>
+        <div style="font-size:13px;font-weight:800;color:#111827;margin-top:6px">기존 prior + 김민수의 구조화 prior codes</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:6px">사용자 원문 문장은 포함하지 않음</div>
+      </div>
+    </div>
+  </div>
+</div>

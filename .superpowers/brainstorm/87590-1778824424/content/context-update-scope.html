@@ -1,0 +1,35 @@
+<h2>다음 추천에 바로 반영되는 컨텍스트</h2>
+<p class="subtitle">저장 완료 후 받은 답변은 단순 피드백이 아니라, 다음 AI 추천 전에 조회되는 context로 업데이트됩니다.</p>
+
+<div class="mockup">
+  <div class="mockup-header">현재 구조에 추가될 흐름</div>
+  <div class="mockup-body">
+    <div style="display:grid;gap:10px">
+      <div style="border-radius:12px;background:#f9fafb;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#111827">1. 거래 저장</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:3px">Event + Transaction 저장 완료</div>
+      </div>
+      <div style="text-align:center;color:#9ca3af;font-weight:900">↓</div>
+      <div style="border-radius:12px;background:#eff6ff;padding:12px;border:1px solid #bfdbfe">
+        <div style="font-size:12px;font-weight:900;color:#1d4ed8">2. 변경 이유 질문</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:3px">선택 칩 + 직접 입력으로 사용자 선택 맥락 수집</div>
+      </div>
+      <div style="text-align:center;color:#9ca3af;font-weight:900">↓</div>
+      <div style="border-radius:12px;background:#ecfdf5;padding:12px;border:1px solid #a7f3d0">
+        <div style="font-size:12px;font-weight:900;color:#047857">3. 관계 context 업데이트</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:3px">방향, 차액, 이유 코드, 직접 입력을 저장해 다음 추천에서 즉시 조회</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">확정된 저장 단위</div>
+  <div class="mockup-body">
+    <div style="border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;padding:14px">
+      <div style="font-size:13px;font-weight:900;color:#1d4ed8">개별 상대방 단위 context</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:6px">예: 김민수에게는 사용자가 현금 준비 금액을 자주 고려해 추천보다 낮춰 저장했다.</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:4px">다음에 김민수 이름으로 AI 분석이 들어오면 행사 유형과 무관하게 이 context를 먼저 조회합니다.</div>
+    </div>
+  </div>
+</div>

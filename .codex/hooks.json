@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | grep -q '^git commit' && bash /Users/jiwon/Downloads/maeum-jungsan/scripts/deploy.sh 2>&1 || true",
+            "timeout": 300,
+            "statusMessage": "Deploying to EC2..."
+          }
+        ]
+      }
+    ]
+  }
+}

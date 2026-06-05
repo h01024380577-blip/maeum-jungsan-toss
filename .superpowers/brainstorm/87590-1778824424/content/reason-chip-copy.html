@@ -1,0 +1,46 @@
+<h2>이유 칩 문구 수정안</h2>
+<p class="subtitle">AI 추천 근거와 겹치는 관계·과거 금액·보답성 표현은 빼고, 사용자가 금액을 조정한 상황 중심 문구로 바꿨습니다.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">추천보다 낮춘 경우</div>
+    <div class="mockup-body">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">이번 달 지출을 감안해서</div>
+        <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">현금 준비 금액에 맞춰서</div>
+        <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">함께 내는 금액이 있어서</div>
+        <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">참석 방식이 달라서</div>
+        <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">금액 단위를 낮춰 맞춰서</div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">추천보다 올린 경우</div>
+    <div class="mockup-body">
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">현장에서 더 내기로 해서</div>
+        <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">동행 인원까지 고려해서</div>
+        <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">식사·답례까지 생각해서</div>
+        <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">금액 단위를 올려 맞춰서</div>
+        <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">따로 약속한 금액이 있어서</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>이 수정안으로 진행</h3>
+      <p>구현 계획에는 위 칩 문구를 기본값으로 넣고, 직접 입력 필드를 함께 둡니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="revise" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content">
+      <h3>문구 수정 필요</h3>
+      <p>어색한 문구, 추가/삭제할 이유가 있으면 알려주세요.</p>
+    </div>
+  </div>
+</div>

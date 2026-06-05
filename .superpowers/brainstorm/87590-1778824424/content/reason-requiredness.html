@@ -1,0 +1,70 @@
+<h2>변경 이유 답변은 필수일까요?</h2>
+<p class="subtitle">전제: 저장 성공 후 같은 바텀시트 안에서 “저장 완료”와 이유 질문을 함께 보여주고, 선택 칩 + 직접 입력을 제공합니다.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유를 알려주세요</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">받은 금액 기준</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">관계 고려</div>
+          </div>
+          <div style="height:42px;border-radius:14px;background:#2563eb;margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 필수 답변</h3>
+      <p>칩 선택 또는 직접 입력을 해야 완료됩니다. 데이터 품질은 높지만 저장 직후 흐름이 가장 많이 막힙니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">받은 금액 기준</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">직접 입력</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:8px;margin-top:14px">
+            <div style="height:42px;border-radius:14px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900">건너뛰기</div>
+            <div style="height:42px;border-radius:14px;background:#2563eb"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 선택 답변 + 건너뛰기</h3>
+      <p>답변을 유도하되 건너뛰기를 허용합니다. 답변율은 낮을 수 있지만 저장 후 부담이 적습니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:320px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:11px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">지금 남기면 다음 추천이 더 좋아져요</div>
+          <div style="height:48px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+            <div style="height:42px;border-radius:14px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900">나중에</div>
+            <div style="height:42px;border-radius:14px;background:#2563eb;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900">남기기</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 먼저 물어보고, 입력은 사용자가 선택</h3>
+      <p>처음에는 “남기기/나중에”만 보여줍니다. 덜 복잡하지만 한 번 더 눌러야 해서 답변까지 단계가 늘어납니다.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,344 @@
+<h2>저장 직후 의도 질문 UI를 어디에 띄울까요</h2>
+<p class="subtitle">사용자가 추천 금액 10만원을 15만원으로 바꿔 저장한 직후 상황입니다. 각 옵션을 클릭해 선택하세요.</p>
+
+<style>
+  .phone {
+    width: 280px;
+    height: 520px;
+    background: #f8f9fa;
+    border-radius: 28px;
+    border: 3px solid #1a1a1a;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+    font-size: 11px;
+  }
+  .phone-status {
+    height: 24px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #888;
+  }
+  .phone-body {
+    height: calc(100% - 24px);
+    position: relative;
+    background: #f3f4f6;
+  }
+  .entry-card {
+    background: #fff;
+    margin: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .entry-card .name { font-weight: 600; color: #111; }
+  .entry-card .meta { color: #888; font-size: 10px; margin-top: 4px; }
+  .entry-card .amount { color: #2563eb; font-weight: 700; margin-top: 6px; }
+  .entry-card.just-saved { border: 1.5px solid #3b82f6; }
+
+  .toast {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 80px;
+    background: rgba(20, 20, 30, 0.92);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .slideup-card {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
+    border: 1px solid #e5e7eb;
+  }
+  .slideup-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #6b7280;
+    margin-bottom: 8px;
+  }
+  .slideup-card .q {
+    font-size: 11px;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .chip {
+    background: #f1f5f9;
+    color: #334155;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    border: 1px solid #e2e8f0;
+  }
+  .free-input {
+    width: 100%;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 10px;
+    color: #94a3b8;
+    box-sizing: border-box;
+  }
+
+  .bottomsheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding: 16px 14px 18px;
+    box-shadow: 0 -6px 24px rgba(0,0,0,0.18);
+    border-top: 1px solid #e5e7eb;
+  }
+  .bottomsheet .grabber {
+    width: 36px;
+    height: 4px;
+    background: #d1d5db;
+    border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+  .bottomsheet .saved-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #10b981;
+    font-size: 10px;
+    margin-bottom: 12px;
+  }
+  .bottomsheet .check {
+    width: 14px;
+    height: 14px;
+    background: #10b981;
+    border-radius: 50%;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+  }
+
+  .toast-inline {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 12px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    border-left: 3px solid #3b82f6;
+  }
+  .toast-inline .small-q {
+    font-size: 10px;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 6px;
+  }
+  .toast-inline .mini-chips {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .toast-inline .chip {
+    flex-shrink: 0;
+    padding: 4px 8px;
+    font-size: 9px;
+  }
+
+  .bubble-callout {
+    position: absolute;
+    background: #fff;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    font-size: 10px;
+    max-width: 220px;
+  }
+  .bubble-callout:before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 24px;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    border-left: 1px solid #e5e7eb;
+    transform: rotate(45deg);
+  }
+  .bubble-callout .micro-q {
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 6px;
+  }
+  .dim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+  }
+</style>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>슬라이드업 카드</h3>
+      <p>저장 토스트 → 카드 화면 하단에서 슬라이드업, 칩+직접입력. 외부 탭하면 닫힘.</p>
+      <div class="phone" style="margin-top:12px">
+        <div class="phone-status">9:41</div>
+        <div class="phone-body">
+          <div class="entry-card just-saved">
+            <div class="name">김민수 결혼식</div>
+            <div class="meta">2026.05.20 · 회사 동료</div>
+            <div class="amount">15만원 (추천 10만원에서 변경)</div>
+          </div>
+          <div class="entry-card">
+            <div class="name">박지영 돌잔치</div>
+            <div class="meta">2026.04.12 · 친척</div>
+            <div class="amount">5만원</div>
+          </div>
+          <div class="slideup-card">
+            <div class="head">
+              <span>AI 더 똑똑하게</span>
+              <span>✕</span>
+            </div>
+            <div class="q">10만원 추천을 15만원으로<br/>바꾸신 이유는 뭐예요?</div>
+            <div class="chips">
+              <span class="chip">관계가 더 가까워</span>
+              <span class="chip">호텔 예식이라</span>
+              <span class="chip">받은 게 있어</span>
+              <span class="chip">평소 기준</span>
+            </div>
+            <input class="free-input" placeholder="직접 입력..."/>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>저장 완료 바텀시트 통합</h3>
+      <p>저장 후 곧장 바텀시트 등장. 저장 완료 메시지와 인터뷰가 한 흐름.</p>
+      <div class="phone" style="margin-top:12px">
+        <div class="phone-status">9:41</div>
+        <div class="phone-body">
+          <div class="entry-card just-saved">
+            <div class="name">김민수 결혼식</div>
+            <div class="meta">2026.05.20 · 회사 동료</div>
+            <div class="amount">15만원</div>
+          </div>
+          <div class="dim"></div>
+          <div class="bottomsheet">
+            <div class="grabber"></div>
+            <div class="saved-line">
+              <span class="check">✓</span>
+              <span>저장 완료</span>
+            </div>
+            <div class="q" style="font-size:11px;font-weight:600;color:#111;margin-bottom:10px;line-height:1.4">
+              10만원 추천을 15만원으로<br/>바꾸신 이유는 뭐예요?
+            </div>
+            <div class="chips">
+              <span class="chip">관계가 더 가까워</span>
+              <span class="chip">호텔 예식이라</span>
+              <span class="chip">받은 게 있어</span>
+              <span class="chip">평소 기준</span>
+            </div>
+            <input class="free-input" placeholder="직접 입력..."/>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>토스트 인라인 (확장형)</h3>
+      <p>토스트 자체에 칩만. 탭하면 확장돼 직접입력 칸 나타남. 가장 가벼움.</p>
+      <div class="phone" style="margin-top:12px">
+        <div class="phone-status">9:41</div>
+        <div class="phone-body">
+          <div class="entry-card just-saved">
+            <div class="name">김민수 결혼식</div>
+            <div class="meta">2026.05.20 · 회사 동료</div>
+            <div class="amount">15만원</div>
+          </div>
+          <div class="entry-card">
+            <div class="name">박지영 돌잔치</div>
+            <div class="meta">2026.04.12 · 친척</div>
+            <div class="amount">5만원</div>
+          </div>
+          <div class="toast-inline">
+            <div class="small-q">왜 15만원으로 바꾸셨어요?</div>
+            <div class="mini-chips">
+              <span class="chip">가까워</span>
+              <span class="chip">호텔</span>
+              <span class="chip">받은 게</span>
+              <span class="chip">평소</span>
+              <span class="chip">직접 입력</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>거래 카드 옆 풍선</h3>
+      <p>비동기 풍선. 사용자가 거래 리스트로 돌아가면 방금 저장된 거래 옆에 표시.</p>
+      <div class="phone" style="margin-top:12px">
+        <div class="phone-status">9:41</div>
+        <div class="phone-body">
+          <div class="entry-card just-saved">
+            <div class="name">김민수 결혼식</div>
+            <div class="meta">2026.05.20 · 회사 동료</div>
+            <div class="amount">15만원</div>
+          </div>
+          <div class="bubble-callout" style="top: 95px; left: 16px;">
+            <div class="micro-q">15만원으로 바꾸신 이유?</div>
+            <div class="chips" style="margin-bottom:0">
+              <span class="chip">가까워</span>
+              <span class="chip">호텔</span>
+              <span class="chip">기타</span>
+            </div>
+          </div>
+          <div class="entry-card" style="margin-top:80px">
+            <div class="name">박지영 돌잔치</div>
+            <div class="meta">2026.04.12 · 친척</div>
+            <div class="amount">5만원</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

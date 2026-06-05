@@ -1,0 +1,59 @@
+<h2>저장 완료 후 이유 질문은 얼마나 강하게 보여줄까요?</h2>
+<p class="subtitle">조건: AI 추천 금액과 최종 저장 금액이 다를 때만 표시합니다.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:300px;margin:0 auto;border:1px solid #e5e7eb;border-radius:26px;background:#f8fafc;padding:14px">
+        <div style="height:44px;border-radius:14px;background:#dbeafe;color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px">저장 완료!</div>
+        <div style="margin-top:90px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px;box-shadow:0 16px 36px rgba(15,23,42,.12)">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:6px">AI 추천 10만원 → 저장 7만원</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+            <div style="height:36px;border-radius:12px;background:#f1f5f9"></div>
+            <div style="height:36px;border-radius:12px;background:#2563eb"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 필수 바텀시트</h3>
+      <p>저장 완료 후 바로 이유 입력/선택 시트를 띄웁니다. 답변하거나 건너뛰어야 닫힙니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:300px;margin:0 auto;border:1px solid #e5e7eb;border-radius:26px;background:#f8fafc;padding:14px">
+        <div style="height:44px;border-radius:14px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px">저장 완료!</div>
+        <div style="height:130px"></div>
+        <div style="border-radius:18px;background:#111827;color:white;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font-size:12px;font-weight:800">금액 변경 이유를 남길까요?</div>
+          <div style="font-size:12px;font-weight:900;color:#93c5fd">남기기</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 토스트/스낵바 액션</h3>
+      <p>저장 완료는 바로 끝내고, 하단 토스트의 “남기기”를 눌렀을 때만 질문합니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:300px;margin:0 auto;border:1px solid #e5e7eb;border-radius:26px;background:#f8fafc;padding:14px">
+        <div style="height:44px;border-radius:14px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px">저장 완료!</div>
+        <div style="margin-top:12px;border-radius:18px;background:#eff6ff;border:1px solid #bfdbfe;padding:13px">
+          <div style="font-size:12px;font-weight:900;color:#2563eb">AI 학습에 도움돼요</div>
+          <div style="font-size:13px;font-weight:900;color:#111827;margin-top:4px">금액을 바꾼 이유를 알려주세요</div>
+          <div style="margin-top:10px;height:34px;border-radius:12px;background:white;border:1px solid #dbeafe"></div>
+        </div>
+        <div style="height:80px"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 저장 후 화면 안에 인라인 카드</h3>
+      <p>시트를 닫지 않고, 저장 완료 상태에서 짧은 카드로 이유를 묻습니다. 덜 갑작스럽지만 화면 설계가 더 복잡합니다.</p>
+    </div>
+  </div>
+</div>

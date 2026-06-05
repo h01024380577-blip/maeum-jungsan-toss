@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>온보딩 목업 — 마음정산</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f0f2f5;
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+      padding: 40px 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 800;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 36px;
+    }
+    .slides-row {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .slide-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .slide-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      letter-spacing: 0.05em;
+    }
+    .phone {
+      width: 280px;
+      height: 560px;
+      background: white;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    /* 이미지 영역 */
+    .phone-image {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .phone-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+    /* 이미지 없는 CTA 슬라이드 */
+    .phone-cta-top {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #eff6ff 0%, #f0fdf4 100%);
+      gap: 12px;
+    }
+    .app-icon {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(59,130,246,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+    .app-name {
+      font-size: 15px;
+      font-weight: 900;
+      color: #1e3a5f;
+    }
+    /* 콘텐츠 하단 */
+    .phone-content {
+      flex-shrink: 0;
+      padding: 16px 18px 18px;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    /* 건너뛰기 + 도트 행 */
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .skip-btn {
+      font-size: 11px;
+      font-weight: 700;
+      color: #9ca3af;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+    .skip-hidden {
+      visibility: hidden;
+    }
+    .dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .dot {
+      height: 5px;
+      border-radius: 99px;
+      background: #e5e7eb;
+      width: 5px;
+      transition: all 0.2s;
+    }
+    .dot.active {
+      width: 20px;
+      background: #3b82f6;
+    }
+    /* 텍스트 */
+    .slide-title {
+      font-size: 17px;
+      font-weight: 900;
+      color: #030712;
+      line-height: 1.35;
+      word-break: keep-all;
+    }
+    .slide-body {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+    /* 버튼 */
+    .next-btn {
+      margin-top: 2px;
+      height: 44px;
+      border-radius: 14px;
+      background: #3b82f6;
+      color: white;
+      font-size: 13px;
+      font-weight: 900;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    .next-btn.ghost {
+      background: #1d4ed8;
+    }
+    /* 슬라이드별 이미지 배경 색상 (이미지 로드 전 fallback) */
+    .bg-blue   { background: linear-gradient(160deg, #dbeafe 0%, #ede9fe 100%); }
+    .bg-purple { background: linear-gradient(160deg, #ede9fe 0%, #fce7f3 100%); }
+    .bg-green  { background: linear-gradient(160deg, #d1fae5 0%, #dbeafe 100%); }
+    .bg-amber  { background: linear-gradient(160deg, #fef3c7 0%, #fce7f3 100%); }
+
+    /* 이미지 placeholder (실제 스크린샷 대신 앱 화면 묘사) */
+    .mock-screen {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 10px 10px;
+      gap: 6px;
+    }
+    .mock-bar {
+      height: 7px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.55);
+    }
+    .mock-bar.short { width: 50%; }
+    .mock-bar.mid   { width: 70%; }
+    .mock-bar.full  { width: 100%; }
+    .mock-card {
+      border-radius: 12px;
+      background: rgba(255,255,255,0.7);
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .mock-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .mock-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mock-line {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(0,0,0,0.13);
+    }
+    .mock-line.w60 { width: 60%; }
+    .mock-line.w80 { width: 80%; }
+    .mock-line.w40 { width: 40%; }
+
+    /* 슬라이드1: 개요 */
+    .s1-top { background: linear-gradient(135deg, #bfdbfe, #ddd6fe); }
+    .s2-top { background: linear-gradient(135deg, #c7d2fe, #fbcfe8); }
+    .s3-top { background: linear-gradient(135deg, #a7f3d0, #bfdbfe); }
+    .s4-top { background: linear-gradient(135deg, #fed7aa, #fde68a); }
+
+    /* 배지 */
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #3b82f6;
+      color: white;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 99px;
+      width: fit-content;
+    }
+    .amount-chip {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+    .stat-bar-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .stat-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-label {
+      font-size: 8px;
+      font-weight: 700;
+      color: rgba(0,0,0,0.4);
+      width: 28px;
+      flex-shrink: 0;
+    }
+    .stat-bar-bg {
+      flex: 1;
+      height: 7px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .stat-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>온보딩 마이그레이션 — 목업</h1>
+  <p class="subtitle">FullscreenSlideOnboarding · 5슬라이드 구성 (실제 구현 시 /onboarding/*.png 이미지 사용)</p>
+
+  <div class="slides-row">
+
+    <!-- 슬라이드 1 -->
+    <div class="slide-wrapper">
+      <div class="slide-label">SLIDE 1 / 5</div>
+      <div class="phone">
+        <div class="phone-image s1-top">
+          <div class="mock-screen">
+            <!-- 상단 탭바 묘사 -->
+            <div style="display:flex;gap:6px;margin-bottom:4px">
+              <div class="mock-bar" style="width:30%;background:rgba(255,255,255,0.8);height:8px"></div>
+            </div>
+            <!-- 카드들 -->
+            <div class="mock-card">
+              <div class="mock-dot" style="background:#fca5a5"></div>
+              <div class="mock-lines">
+                <div class="mock-line w80"></div>
+                <div class="mock-line w60"></div>
+              </div>
+              <div style="font-size:9px;font-weight:800;color:#ef4444">-10만</div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-dot" style="background:#86efac"></div>
+              <div class="mock-lines">
+                <div class="mock-line w80"></div>
+                <div class="mock-line w60"></div>
+              </div>
+              <div style="font-size:9px;font-weight:800;color:#16a34a">+5만</div>
+            </div>
+            <div class="mock-card">
+              <div class="mock-dot" style="background:#93c5fd"></div>
+              <div class="mock-lines">
+                <div class="mock-line w60"></div>
+                <div class="mock-line w40"></div>
+              </div>
+              <div style="font-size:9px;font-weight:800;color:#2563eb">-5만</div>
+            </div>
+            <div class="mock-card" style="opacity:0.6">
+              <div class="mock-dot" style="background:#d1d5db"></div>
+              <div class="mock-lines">
+                <div class="mock-line w80"></div>
+                <div class="mock-line w60"></div>
+              </div>
+            </div>
+            <!-- 요약 카드 -->
+            <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:10px 12px;margin-top:4px">
+              <div style="font-size:9px;font-weight:800;color:#374151;margin-bottom:6px">이번 달 요약</div>
+              <div style="display:flex;justify-content:space-between">
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#9ca3af;font-weight:600">보낸 마음</div>
+                  <div style="font-size:12px;font-weight:900;color:#374151">150만</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#9ca3af;font-weight:600">받은 마음</div>
+                  <div style="font-size:12px;font-weight:900;color:#374151">80만</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-content">
+          <div class="top-row">
+            <div class="dots">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <button class="skip-btn">건너뛰기</button>
+          </div>
+          <div class="slide-title">경조사 마음,<br>한눈에 정리해요</div>
+          <div class="slide-body">줬다·받은 마음을 한곳에 기록하고<br>언제든 꺼내볼 수 있어요</div>
+          <button class="next-btn">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 2 -->
+    <div class="slide-wrapper">
+      <div class="slide-label">SLIDE 2 / 5</div>
+      <div class="phone">
+        <div class="phone-image s2-top">
+          <div class="mock-screen">
+            <!-- AI 분석 화면 묘사 -->
+            <div style="background:rgba(255,255,255,0.85);border-radius:12px;padding:10px 12px;margin-bottom:6px">
+              <div class="ai-badge">✦ AI 분석</div>
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+                <div>
+                  <div style="font-size:8px;color:#9ca3af;font-weight:600;margin-bottom:3px">이름</div>
+                  <div style="background:#eff6ff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800;color:#1e40af">김○○ 님</div>
+                </div>
+                <div>
+                  <div style="font-size:8px;color:#9ca3af;font-weight:600;margin-bottom:3px">날짜</div>
+                  <div style="background:#eff6ff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800;color:#1e40af">2026년 7월 5일 (토)</div>
+                </div>
+                <div>
+                  <div style="font-size:8px;color:#9ca3af;font-weight:600;margin-bottom:3px">장소</div>
+                  <div style="background:#eff6ff;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800;color:#1e40af">○○ 웨딩홀 3층</div>
+                </div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.7);border-radius:12px;padding:10px 12px">
+              <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:6px">💡 AI 금액 추천</div>
+              <div style="font-size:18px;font-weight:900;color:#1e40af">100,000원</div>
+              <div style="font-size:9px;color:#6b7280;margin-top:2px">친구 사이 평균적인 마음이에요</div>
+            </div>
+            <!-- 링크 입력창 -->
+            <div style="background:rgba(255,255,255,0.9);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;margin-top:4px">
+              <div style="font-size:18px">🔗</div>
+              <div style="flex:1">
+                <div style="font-size:9px;font-weight:600;color:#9ca3af">청첩장 링크 붙여넣기</div>
+                <div class="mock-bar mid" style="height:5px;margin-top:4px;background:#e5e7eb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-content">
+          <div class="top-row">
+            <div class="dots">
+              <div class="dot"></div>
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <button class="skip-btn">건너뛰기</button>
+          </div>
+          <div class="slide-title">청첩장 링크 하나로<br>자동 입력돼요</div>
+          <div class="slide-body">AI가 이름·날짜·장소를 읽어서<br>바로 채워줘요</div>
+          <button class="next-btn">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 3 -->
+    <div class="slide-wrapper">
+      <div class="slide-label">SLIDE 3 / 5</div>
+      <div class="phone">
+        <div class="phone-image s3-top">
+          <div class="mock-screen">
+            <!-- 입금내역 분석 화면 묘사 -->
+            <div style="background:rgba(255,255,255,0.85);border-radius:12px;padding:10px 12px;margin-bottom:6px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                <div class="ai-badge" style="background:#10b981">✦ 입금 분석</div>
+                <div style="font-size:9px;color:#6b7280;font-weight:600">3건 발견됨</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="background:#f0fdf4;border-radius:8px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <div style="font-size:10px;font-weight:800;color:#065f46">박○○</div>
+                    <div style="font-size:8px;color:#6b7280">2026.05.10</div>
+                  </div>
+                  <div style="font-size:11px;font-weight:900;color:#059669">+50,000</div>
+                </div>
+                <div style="background:#f0fdf4;border-radius:8px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <div style="font-size:10px;font-weight:800;color:#065f46">이○○</div>
+                    <div style="font-size:8px;color:#6b7280">2026.05.10</div>
+                  </div>
+                  <div style="font-size:11px;font-weight:900;color:#059669">+100,000</div>
+                </div>
+                <div style="background:#f0fdf4;border-radius:8px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <div style="font-size:10px;font-weight:800;color:#065f46">최○○</div>
+                    <div style="font-size:8px;color:#6b7280">2026.05.11</div>
+                  </div>
+                  <div style="font-size:11px;font-weight:900;color:#059669">+70,000</div>
+                </div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.7);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px">
+              <div style="font-size:20px">📸</div>
+              <div>
+                <div style="font-size:9px;font-weight:800;color:#374151">입금 내역 이미지 업로드</div>
+                <div style="font-size:8px;color:#9ca3af;margin-top:1px">카카오페이·토스 캡처 사용 가능</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-content">
+          <div class="top-row">
+            <div class="dots">
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <button class="skip-btn">건너뛰기</button>
+          </div>
+          <div class="slide-title">받은 마음도<br>자동으로 정리해요</div>
+          <div class="slide-body">입금 내역 이미지를 올리면 AI가<br>받은 마음을 한번에 찾아줘요</div>
+          <button class="next-btn">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 4 -->
+    <div class="slide-wrapper">
+      <div class="slide-label">SLIDE 4 / 5</div>
+      <div class="phone">
+        <div class="phone-image s4-top">
+          <div class="mock-screen">
+            <!-- 통계 화면 묘사 -->
+            <div style="background:rgba(255,255,255,0.85);border-radius:12px;padding:10px 12px;margin-bottom:6px">
+              <div style="font-size:9px;font-weight:800;color:#374151;margin-bottom:8px">관계별 지출 현황</div>
+              <div class="stat-bar-wrap">
+                <div class="stat-row">
+                  <div class="stat-label">가족</div>
+                  <div class="stat-bar-bg">
+                    <div class="stat-bar-fill" style="width:85%;background:#3b82f6"></div>
+                  </div>
+                  <div style="font-size:8px;font-weight:800;color:#374151;min-width:28px;text-align:right">85만</div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-label">친구</div>
+                  <div class="stat-bar-bg">
+                    <div class="stat-bar-fill" style="width:62%;background:#8b5cf6"></div>
+                  </div>
+                  <div style="font-size:8px;font-weight:800;color:#374151;min-width:28px;text-align:right">62만</div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-label">동료</div>
+                  <div class="stat-bar-bg">
+                    <div class="stat-bar-fill" style="width:40%;background:#f59e0b"></div>
+                  </div>
+                  <div style="font-size:8px;font-weight:800;color:#374151;min-width:28px;text-align:right">40만</div>
+                </div>
+                <div class="stat-row">
+                  <div class="stat-label">지인</div>
+                  <div class="stat-bar-bg">
+                    <div class="stat-bar-fill" style="width:20%;background:#10b981"></div>
+                  </div>
+                  <div style="font-size:8px;font-weight:800;color:#374151;min-width:28px;text-align:right">20만</div>
+                </div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.7);border-radius:12px;padding:10px 12px">
+              <div style="font-size:9px;font-weight:800;color:#374151;margin-bottom:6px">연도별 총계</div>
+              <div style="display:flex;justify-content:space-between">
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#9ca3af">2024</div>
+                  <div style="font-size:13px;font-weight:900;color:#374151">312만</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#9ca3af">2025</div>
+                  <div style="font-size:13px;font-weight:900;color:#374151">207만</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#3b82f6">2026</div>
+                  <div style="font-size:13px;font-weight:900;color:#3b82f6">150만</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-content">
+          <div class="top-row">
+            <div class="dots">
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot active"></div>
+              <div class="dot"></div>
+            </div>
+            <button class="skip-btn">건너뛰기</button>
+          </div>
+          <div class="slide-title">관계별 통계로<br>흐름을 파악해요</div>
+          <div class="slide-body">누구에게 얼마나 마음을 건넸는지<br>한눈에 볼 수 있어요</div>
+          <button class="next-btn">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 5 (CTA) -->
+    <div class="slide-wrapper">
+      <div class="slide-label">SLIDE 5 / 5 — 로그인 CTA</div>
+      <div class="phone">
+        <div class="phone-cta-top">
+          <div class="app-icon">💙</div>
+          <div class="app-name">마음정산</div>
+          <div style="font-size:11px;color:#6b7280;font-weight:600;text-align:center;line-height:1.6;padding:0 24px">경조사 마음을<br>스마트하게 정리해요</div>
+        </div>
+        <div class="phone-content">
+          <div class="top-row">
+            <div class="dots">
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot active"></div>
+            </div>
+            <button class="skip-btn skip-hidden">건너뛰기</button>
+          </div>
+          <div class="slide-title">시작할 준비가<br>됐어요</div>
+          <div class="slide-body">로그인하면 기록이 안전하게<br>저장돼요</div>
+          <button class="next-btn ghost">토스로 시작하기</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="text-align:center;margin-top:32px;font-size:12px;color:#9ca3af;">
+    실제 구현 시 이미지 영역에 <code>/onboarding/maeum-onboarding-*.png</code> 스크린샷이 들어갑니다
+  </p>
+</body>
+</html>

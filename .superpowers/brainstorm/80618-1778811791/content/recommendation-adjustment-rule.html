@@ -1,0 +1,65 @@
+<h2>다음 추천 반영 방식</h2>
+<p class="subtitle">상대방 context가 생긴 뒤, 다음 AI 추천 금액을 어떻게 바꿀지 정해야 합니다.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A. 기존 추천 + context 보정</div>
+    <div class="mockup-body">
+      <div style="display:grid;gap:8px">
+        <div style="font-size:13px;font-weight:900;color:#111827">기본 추천 10만</div>
+        <div style="height:1px;background:#e5e7eb"></div>
+        <div style="font-size:12px;color:#6b7280">김민수 context: 지난번 추천보다 2만 낮춤</div>
+        <div style="font-size:16px;font-weight:900;color:#2563eb">다음 추천 8만</div>
+      </div>
+      <p style="margin-top:10px;font-size:12px;color:#6b7280">기존 추천 로직은 유지하고, 상대방 context를 보정값처럼 즉시 반영합니다.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">B. 마지막 선택 금액 우선</div>
+    <div class="mockup-body">
+      <div style="display:grid;gap:8px">
+        <div style="font-size:13px;font-weight:900;color:#111827">기본 추천 10만</div>
+        <div style="height:1px;background:#e5e7eb"></div>
+        <div style="font-size:12px;color:#6b7280">김민수 마지막 저장 금액: 7만</div>
+        <div style="font-size:16px;font-weight:900;color:#2563eb">다음 추천 7만</div>
+      </div>
+      <p style="margin-top:10px;font-size:12px;color:#6b7280">가장 즉각적이지만, 한 번의 특수 상황이 계속 반복될 위험이 있습니다.</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">C. 이유별 규칙으로 직접 조정</div>
+  <div class="mockup-body">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <span style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:8px 10px;font-size:12px;font-weight:900">현금 준비 금액 → -1만</span>
+      <span style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:8px 10px;font-size:12px;font-weight:900">동행 인원 → +1만</span>
+      <span style="border-radius:999px;background:#ecfdf5;color:#047857;padding:8px 10px;font-size:12px;font-weight:900">약속한 금액 → 해당 금액 우선</span>
+    </div>
+    <p style="font-size:12px;color:#6b7280">이유마다 추천 조정 규칙을 명시합니다. 설명은 좋지만, 규칙 설계가 더 많이 필요합니다.</p>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option selected" data-choice="A" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>기존 추천 + context 보정</h3>
+      <p>기존 AI prior를 유지하면서 사용자 선택 prior를 즉시 보정값으로 더합니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="B" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>마지막 선택 금액 우선</h3>
+      <p>같은 상대방이면 직전 사용자가 저장한 최종 금액을 다음 추천의 중심값으로 둡니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="C" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>이유별 규칙 직접 적용</h3>
+      <p>각 이유 코드가 추천 금액을 어떻게 바꾸는지 명시적인 룰을 둡니다.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+<h2>이유 칩은 몇 개까지 선택하게 할까요?</h2>
+<p class="subtitle">전제: 추천보다 낮춘 경우에는 낮춘 이유만, 올린 경우에는 올린 이유만 표시합니다.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">추천보다 낮춘 경우 예시</div>
+    <div class="mockup-body">
+      <div style="max-width:330px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:10px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">추천보다 낮춘 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">부담을 줄이려고</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">가까운 관계는 아니어서</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">예산을 고려해서</div>
+          </div>
+          <div style="margin-top:10px;height:46px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb;padding:10px;color:#94a3b8;font-size:12px;font-weight:800">직접 입력도 가능</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">추천보다 올린 경우 예시</div>
+    <div class="mockup-body">
+      <div style="max-width:330px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:10px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">추천보다 올린 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 15만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">더 챙기고 싶어서</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">관계가 가까워서</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">지난번 받은 금액에 맞춰서</div>
+          </div>
+          <div style="margin-top:10px;height:46px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb;padding:10px;color:#94a3b8;font-size:12px;font-weight:800">직접 입력도 가능</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>하나만 선택</h3>
+      <p>가장 중요한 이유 하나만 남깁니다. 데이터 분석은 단순하지만 실제 이유가 여러 개인 경우 표현이 부족할 수 있습니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>여러 개 선택 가능</h3>
+      <p>복합적인 이유를 담을 수 있습니다. UI에는 선택 개수와 해제 상태가 명확히 보여야 합니다.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>칩 하나 + 직접 입력 보완</h3>
+      <p>대표 이유 하나를 고르고, 필요한 경우 직접 입력으로 보완합니다. 분석과 자유도를 절충합니다.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,94 @@
+<h2>첫 화면에서 무엇을 먼저 약속할까요?</h2>
+<p class="subtitle">멘토님 피드백의 핵심은 “사용자가 이 앱을 쓰면 무엇을 얻는지”가 바로 보여야 한다는 점이에요. 가장 끌리는 방향을 하나 골라주세요.</p>
+
+<div class="cards">
+  <div class="card" data-choice="result" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:220px;border-radius:18px;background:#f5f7fb;padding:22px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-weight:900;font-size:22px;color:#111827">이번 달 마음정산</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:14px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">받은 마음</div>
+            <div style="margin-top:10px;color:#2563eb;font-size:20px;font-weight:900">36만원</div>
+          </div>
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:14px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">보낸 마음</div>
+            <div style="margin-top:10px;color:#ef4444;font-size:20px;font-weight:900">24만원</div>
+          </div>
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:14px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">합계</div>
+            <div style="margin-top:10px;color:#2563eb;font-size:20px;font-weight:900">+12만원</div>
+          </div>
+        </div>
+        <div style="background:white;border:1px solid #e9edf3;border-radius:18px;padding:15px;display:flex;justify-content:space-between">
+          <div>
+            <div style="font-weight:900;color:#111827">김하윤</div>
+            <div style="font-size:12px;color:#8b95a1;margin-top:4px">결혼 · 6월 14일</div>
+          </div>
+          <div style="font-weight:900;color:#ef4444">-10만원</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 결과 먼저 보여주기</h3>
+      <p>“흩어진 경조사비가 월별 정산표와 내역으로 정리된다”를 첫 장에서 바로 보여줘요.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="process" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:220px;border-radius:18px;background:#f5f7fb;padding:24px;display:flex;align-items:center;justify-content:center">
+        <div style="display:flex;align-items:center;gap:12px;width:100%;justify-content:center">
+          <div style="width:92px;height:92px;border-radius:24px;background:white;border:1px solid #e9edf3;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:24px">🔗</div>
+            <div style="font-size:12px;font-weight:900;margin-top:8px">붙여넣기</div>
+          </div>
+          <div style="font-size:24px;color:#3b82f6;font-weight:900">→</div>
+          <div style="width:92px;height:92px;border-radius:24px;background:white;border:1px solid #e9edf3;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:24px">✨</div>
+            <div style="font-size:12px;font-weight:900;margin-top:8px">AI 정리</div>
+          </div>
+          <div style="font-size:24px;color:#3b82f6;font-weight:900">→</div>
+          <div style="width:92px;height:92px;border-radius:24px;background:white;border:1px solid #e9edf3;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:24px">📊</div>
+            <div style="font-size:12px;font-weight:900;margin-top:8px">자동 정산</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 3단계 과정 보여주기</h3>
+      <p>“링크/사진/메시지 → AI 입력 → 정산 관리”처럼 사용자가 뭘 하면 되는지 먼저 안내해요.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:220px;border-radius:18px;background:#f5f7fb;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:white;border:1px solid #e9edf3;border-radius:18px;padding:14px">
+          <div style="font-size:12px;color:#2563eb;font-weight:900">1분이면</div>
+          <div style="font-size:20px;line-height:1.2;font-weight:900;margin-top:6px;color:#111827">청첩장이<br/>정산 내역으로</div>
+          <div style="margin-top:16px;height:38px;border-radius:14px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px">URL 붙여넣기</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:13px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">AI 추출</div>
+            <div style="font-size:15px;font-weight:900;margin-top:7px">이름·날짜·장소</div>
+          </div>
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:13px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">정산 결과</div>
+            <div style="font-size:15px;font-weight:900;margin-top:7px;color:#2563eb">+12만원</div>
+          </div>
+          <div style="background:white;border:1px solid #e9edf3;border-radius:16px;padding:13px">
+            <div style="font-size:11px;color:#8b95a1;font-weight:800">일정 관리</div>
+            <div style="font-size:15px;font-weight:900;margin-top:7px">캘린더 저장</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 과정+결과 하이브리드</h3>
+      <p>첫 장에서 해야 할 행동과 얻게 될 결과를 한 번에 보여줘요. 저는 이 방향을 추천해요.</p>
+    </div>
+  </div>
+</div>

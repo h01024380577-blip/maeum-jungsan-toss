@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Superpowers Brainstorming" [level=1] [ref=e3]:
+      - link "Superpowers Brainstorming" [ref=e4] [cursor=pointer]:
+        - /url: https://github.com/obra/superpowers
+    - generic [ref=e5]: Connected
+  - generic [ref=e7]:
+    - heading "화면 확인 연결 완료" [level=2] [ref=e8]
+    - paragraph [ref=e9]: 이제 이 창에 마음정산 온보딩 방향안과 화면 목업을 하나씩 띄워가며 같이 볼 수 있어요.
+    - generic [ref=e11]:
+      - generic [ref=e12]: "Next: 온보딩 첫 화면 방향 비교"
+      - generic [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: ✓
+        - generic [ref=e17]:
+          - heading "준비됨" [level=3] [ref=e18]
+          - paragraph [ref=e19]: 다음 단계에서 “결과 먼저 보여주기”, “3단계 과정 보여주기”, “실제 화면 미리보기” 중 어떤 첫 화면이 더 직관적인지 비교해볼게요.
+  - generic [ref=e20]: Click an option above, then return to the terminal

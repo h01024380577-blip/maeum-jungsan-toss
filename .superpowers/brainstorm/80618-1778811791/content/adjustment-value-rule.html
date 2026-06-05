@@ -1,0 +1,42 @@
+<h2>이유 기반 context 반영</h2>
+<p class="subtitle">금액 차액을 기억하는 방식은 제외합니다. 저장할 prior는 사용자가 선택한 이유와 그 이유에서 파생되는 상대방 context입니다.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">저장하지 않을 것</div>
+    <div class="mockup-body">
+      <div style="display:grid;gap:8px">
+        <div style="font-size:12px;color:#6b7280">이번 추천과 저장 금액의 차액</div>
+        <div style="font-size:16px;font-weight:900;color:#b91c1c">-2만 같은 raw delta</div>
+        <div style="height:1px;background:#e5e7eb"></div>
+        <div style="font-size:12px;color:#6b7280">문제</div>
+        <div style="font-size:13px;font-weight:800;color:#4b5563">한 번의 선택 금액을 다음 추천에 기계적으로 복사하게 됩니다.</div>
+      </div>
+      <p style="margin-top:10px;font-size:12px;color:#6b7280">이 방식은 사용자의 이유를 학습하지 못하므로 제외합니다.</p>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">저장할 것</div>
+    <div class="mockup-body">
+      <div style="display:grid;gap:8px">
+        <div style="font-size:12px;color:#6b7280">사용자가 고른 이유</div>
+        <div style="font-size:16px;font-weight:900;color:#047857">동행 인원까지 고려해서</div>
+        <div style="height:1px;background:#e5e7eb"></div>
+        <div style="font-size:12px;color:#6b7280">상대방 context</div>
+        <div style="font-size:13px;font-weight:800;color:#4b5563">이 사람에게는 다음 추천 때 동행 인원 prior를 함께 고려</div>
+      </div>
+      <p style="margin-top:10px;font-size:12px;color:#6b7280">다음 추천은 이 이유 context를 입력으로 받아 다시 계산합니다.</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">다음 추천에서의 사용 방식</div>
+  <div class="mockup-body">
+    <div style="border-radius:14px;background:#f9fafb;padding:14px">
+      <div style="font-size:13px;font-weight:900;color:#111827">기존 추천 prior + 상대방 이유 context</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:6px">관계·과거 이력·장소로 기본 추천을 만들고, 같은 상대방에게 저장된 이유 context를 추가 입력으로 넣어 추천을 다시 계산합니다.</div>
+    </div>
+  </div>
+</div>

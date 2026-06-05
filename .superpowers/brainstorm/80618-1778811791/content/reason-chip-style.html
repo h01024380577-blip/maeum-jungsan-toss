@@ -1,0 +1,72 @@
+<h2>이유 선택 칩은 어떤 성격이 좋을까요?</h2>
+<p class="subtitle">전제: 저장 완료 후 같은 바텀시트에서 선택 칩 + 직접 입력을 제공하고, 건너뛰기를 허용합니다.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:330px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:10px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">금액을 바꾼 이유가 있나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">지난번 받은 금액에 맞췄어요</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">관계가 가까워서 더 챙겼어요</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">부담을 줄이고 싶었어요</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 사용자 말투형</h3>
+      <p>“제가 왜 바꿨는지”를 그대로 고르는 느낌입니다. 가장 자연스럽지만 칩 문구가 길어질 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:330px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:10px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">추천과 다르게 저장한 기준</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">최근 주고받은 금액</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">관계 친밀도</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">참석 여부</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">예산 상황</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 기준 태그형</h3>
+      <p>짧은 기준 태그를 고릅니다. UI가 깔끔하고 분석 데이터로 쓰기 쉽지만 감정 표현은 덜합니다.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="max-width:330px;margin:0 auto;border:1px solid #e5e7eb;border-radius:28px;background:#f8fafc;padding:14px">
+        <div style="border-radius:16px;background:#dcfce7;color:#15803d;padding:10px 12px;font-size:13px;font-weight:900;text-align:center">저장 완료</div>
+        <div style="margin-top:14px;border-radius:22px;background:white;border:1px solid #e5e7eb;padding:16px">
+          <div style="font-size:15px;font-weight:900;color:#111827">추천을 어떻게 조정했나요?</div>
+          <div style="font-size:12px;font-weight:800;color:#64748b;margin-top:5px">AI 10만원 → 저장 7만원</div>
+          <div style="font-size:11px;font-weight:900;color:#ef4444;margin-top:14px">낮춘 이유</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:7px">
+            <div style="border-radius:999px;background:#fff7ed;color:#ea580c;padding:9px 12px;font-size:12px;font-weight:900">부담을 줄이려고</div>
+            <div style="border-radius:999px;background:#f1f5f9;color:#475569;padding:9px 12px;font-size:12px;font-weight:900">가까운 관계는 아니어서</div>
+          </div>
+          <div style="font-size:11px;font-weight:900;color:#2563eb;margin-top:12px">올린 이유</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:7px">
+            <div style="border-radius:999px;background:#eff6ff;color:#2563eb;padding:9px 12px;font-size:12px;font-weight:900">더 챙기고 싶어서</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 증감 방향별 이유</h3>
+      <p>추천보다 낮춘 경우/올린 경우에 맞는 칩만 보여줍니다. 가장 맥락적이지만 설계와 문구 관리가 더 필요합니다.</p>
+    </div>
+  </div>
+</div>

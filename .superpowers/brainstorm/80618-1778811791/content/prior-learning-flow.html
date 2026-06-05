@@ -1,0 +1,67 @@
+<h2>금액 변경 이유의 목적</h2>
+<p class="subtitle">이유 수집은 단순한 메모가 아니라, 기존 AI 추천 prior 밖에 있는 사용자의 선택 신호를 다음 추천에 쌓기 위한 흐름으로 봅니다.</p>
+
+<div class="mockup">
+  <div class="mockup-header">저장 후 학습 신호 흐름</div>
+  <div class="mockup-body">
+    <div style="display:grid;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:10px;background:#eef2ff;color:#4f46e5;display:grid;place-items:center;font-weight:900">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:#111827">AI 추천 금액 생성</div>
+          <div style="font-size:12px;color:#6b7280">관계, 과거 이력, 장소 같은 기존 prior로 추천</div>
+        </div>
+      </div>
+      <div style="height:1px;background:#e5e7eb"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:10px;background:#fff7ed;color:#ea580c;display:grid;place-items:center;font-weight:900">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:#111827">사용자가 금액 변경 후 저장</div>
+          <div style="font-size:12px;color:#6b7280">추천 prior로 설명되지 않는 최종 선택 발생</div>
+        </div>
+      </div>
+      <div style="height:1px;background:#e5e7eb"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:10px;background:#ecfdf5;color:#059669;display:grid;place-items:center;font-weight:900">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:#111827">변경 이유를 구조화해 저장</div>
+          <div style="font-size:12px;color:#6b7280">사용자 문구와 별도로 prior code, 방향, 차액을 함께 저장</div>
+        </div>
+      </div>
+      <div style="height:1px;background:#e5e7eb"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:10px;background:#eff6ff;color:#2563eb;display:grid;place-items:center;font-weight:900">4</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:#111827">다음 추천 prior 후보로 활용</div>
+          <div style="font-size:12px;color:#6b7280">반복되는 선택 패턴이 있으면 추천 금액 보정 근거로 사용</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">칩 문구 원칙</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="border-radius:12px;background:#f9fafb;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#6b7280;margin-bottom:8px">제외</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="border-radius:999px;background:#fee2e2;color:#b91c1c;padding:7px 10px;font-size:12px;font-weight:800">가까운 관계</span>
+          <span style="border-radius:999px;background:#fee2e2;color:#b91c1c;padding:7px 10px;font-size:12px;font-weight:800">받은 금액</span>
+          <span style="border-radius:999px;background:#fee2e2;color:#b91c1c;padding:7px 10px;font-size:12px;font-weight:800">보답</span>
+          <span style="border-radius:999px;background:#fee2e2;color:#b91c1c;padding:7px 10px;font-size:12px;font-weight:800">장소 평균</span>
+        </div>
+      </div>
+      <div style="border-radius:12px;background:#f9fafb;padding:12px">
+        <div style="font-size:12px;font-weight:900;color:#6b7280;margin-bottom:8px">수집</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:7px 10px;font-size:12px;font-weight:800">월 지출 상황</span>
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:7px 10px;font-size:12px;font-weight:800">현금 준비</span>
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:7px 10px;font-size:12px;font-weight:800">동행 인원</span>
+          <span style="border-radius:999px;background:#d1fae5;color:#047857;padding:7px 10px;font-size:12px;font-weight:800">따로 약속한 금액</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
