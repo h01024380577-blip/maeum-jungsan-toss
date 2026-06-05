@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { toast } from 'sonner';
 import { useStore } from '@/src/store/useStore';
 import { apiFetch, setAuthToken } from '@/src/lib/apiClient';
@@ -52,8 +52,24 @@ interface FullscreenSlideOnboardingProps {
 export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlideOnboardingProps) {
   const { loadFromSupabase } = useStore();
   const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
   const [isLogging, setIsLogging] = useState(false);
   const isCta = index === CTA_INDEX;
+
+  const goNext = useCallback(() => {
+    setDirection(1);
+    setIndex((i) => Math.min(i + 1, CTA_INDEX));
+  }, []);
+
+  const goPrev = useCallback(() => {
+    setDirection(-1);
+    setIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const handlePanEnd = useCallback((_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    if (info.offset.x < -50 || info.velocity.x < -300) goNext();
+    else if (info.offset.x > 50 || info.velocity.x > 300) goPrev();
+  }, [goNext, goPrev]);
 
   const handleLogin = useCallback(async () => {
     setIsLogging(true);
@@ -86,6 +102,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
   }, [loadFromSupabase, onComplete]);
 
   const handleSkip = useCallback(() => {
+    setDirection(1);
     setIndex(CTA_INDEX);
   }, []);
 
@@ -119,12 +136,16 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
       </div>
 
       {/* 슬라이드 전환 영역: 이미지 + 텍스트 + 버튼이 함께 애니메이션 */}
+      <motion.div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        onPanEnd={handlePanEnd}
+      >
       <AnimatePresence mode="wait">
         <motion.div
           key={index}
-          initial={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, x: direction * 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
+          exit={{ opacity: 0, x: direction * -20 }}
           transition={{ duration: 0.2 }}
           className="flex min-h-0 flex-1 flex-col"
         >
@@ -218,7 +239,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
                 <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">{slide!.body}</p>
                 <button
                   type="button"
-                  onClick={() => setIndex((i) => i + 1)}
+                  onClick={goNext}
                   className="mt-5 h-14 w-full rounded-2xl bg-blue-500 text-[16px] font-black text-white transition-all active:scale-[0.98]"
                 >
                   다음
@@ -228,6 +249,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
           )}
         </motion.div>
       </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
