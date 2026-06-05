@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useStore } from '@/src/store/useStore';
 import { apiFetch, setAuthToken } from '@/src/lib/apiClient';
@@ -66,10 +66,6 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
     setIndex((i) => Math.max(i - 1, 0));
   }, []);
 
-  const handlePanEnd = useCallback((_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
-    if (info.offset.x < -50 || info.velocity.x < -300) goNext();
-    else if (info.offset.x > 50 || info.velocity.x > 300) goPrev();
-  }, [goNext, goPrev]);
 
   const handleLogin = useCallback(async () => {
     setIsLogging(true);
@@ -136,10 +132,6 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
       </div>
 
       {/* 슬라이드 전환 영역: 이미지 + 텍스트 + 버튼이 함께 애니메이션 */}
-      <motion.div
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        onPanEnd={handlePanEnd}
-      >
       <AnimatePresence mode="wait">
         <motion.div
           key={index}
@@ -216,7 +208,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
             </div>
           ) : (
             <>
-              {/* 기능 슬라이드: 폰 프레임 + 텍스트 + 버튼 */}
+              {/* 기능 슬라이드: 폰 프레임 + < > 버튼 */}
               <div className="relative min-h-0 flex-1 bg-gradient-to-b from-blue-50 via-slate-50 to-slate-100">
                 <div className="absolute inset-x-0 inset-y-3 flex items-center justify-center">
                   <div
@@ -233,23 +225,37 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
                     />
                   </div>
                 </div>
+                {/* 이전 버튼 */}
+                {index > 0 && (
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md transition-transform active:scale-95"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                )}
+                {/* 다음 버튼 */}
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-blue-500 shadow-md transition-transform active:scale-95"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
               </div>
               <div className="shrink-0 px-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] pt-3">
                 <h2 className="text-[22px] font-black leading-snug text-gray-950">{slide!.title}</h2>
                 <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">{slide!.body}</p>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="mt-5 h-14 w-full rounded-2xl bg-blue-500 text-[16px] font-black text-white transition-all active:scale-[0.98]"
-                >
-                  다음
-                </button>
               </div>
             </>
           )}
         </motion.div>
       </AnimatePresence>
-      </motion.div>
     </div>
   );
 }
