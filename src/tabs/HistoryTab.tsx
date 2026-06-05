@@ -6,27 +6,9 @@ import { toast } from 'sonner';
 import BulkImportModal from '../components/BulkImportModal';
 import ContactDetail from '../components/ContactDetail';
 import EntryEditSheet from '../components/EntryEditSheet';
-import SlideOnboarding, { type OnboardingSlide } from '../components/onboarding/SlideOnboarding';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { exportToCsv } from '../utils/csvExport';
 import { formatAmountMan } from '../utils/amountFormat';
-
-const IMPORT_ONBOARDING_KEY = 'heartbook-import-onboarding-seen';
-
-const IMPORT_SLIDES: OnboardingSlide[] = [
-  {
-    image: '/onboarding/maeum-onboarding-import-01-deposit.png',
-    imageAlt: '입금 내역 분석 예시',
-    title: '입금 내역을 분석해요',
-    body: '카카오페이·토스 입금 내역 이미지를 업로드하면 받은 마음을 자동으로 인식해줘요.',
-  },
-  {
-    image: '/onboarding/maeum-onboarding-import-02-csv.png',
-    imageAlt: 'CSV 가져오기 예시',
-    title: 'CSV로도 가져올 수 있어요',
-    body: '기존에 쓰던 엑셀·스프레드시트를 CSV로 내보내면 한번에 불러올 수 있어요.',
-  },
-];
 
 const eventIcon = (t: string) => {
   if (t === 'wedding') return <Heart size={14} className="text-pink-500 fill-pink-500" />;
@@ -43,10 +25,6 @@ const safeDate = (d: string) => {
 
 export default function HistoryTab() {
   const { entries, removeEntry, contacts } = useStore();
-  const [showImportOnboarding, setShowImportOnboarding] = useState(false);
-  const [highlightImport, setHighlightImport] = useState(() =>
-    typeof window !== 'undefined' && localStorage.getItem(IMPORT_ONBOARDING_KEY) !== 'true'
-  );
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'given' | 'received'>('all');
   const [importOpen, setImportOpen] = useState(false);
@@ -92,15 +70,7 @@ export default function HistoryTab() {
     setDeleteTarget(null);
   };
 
-  const handleImportClick = () => {
-    setHighlightImport(false);
-    const seen = typeof window !== 'undefined' && localStorage.getItem(IMPORT_ONBOARDING_KEY) === 'true';
-    if (!seen) {
-      setShowImportOnboarding(true);
-    } else {
-      setImportOpen(true);
-    }
-  };
+  const handleImportClick = () => setImportOpen(true);
 
   const clearSelection = () => {
     setSelectionMode(false);
@@ -193,18 +163,6 @@ export default function HistoryTab() {
 
   return (
     <div className="pb-4">
-      {showImportOnboarding && (
-        <SlideOnboarding
-          slides={IMPORT_SLIDES}
-          doneLabel="가져오기 시작"
-          onClose={() => {
-            localStorage.setItem(IMPORT_ONBOARDING_KEY, 'true');
-            setShowImportOnboarding(false);
-            setImportOpen(true);
-          }}
-        />
-      )}
-
       <div className="px-5 pt-14 pb-4 bg-white max-[360px]:px-4">
         <div className="flex items-center justify-between gap-2 max-[360px]:gap-1.5">
           <div className="min-w-0">
@@ -239,11 +197,7 @@ export default function HistoryTab() {
               onClick={handleImportClick}
               disabled={selectionMode}
               aria-label="가져오기"
-              className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-all active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px] ${
-                highlightImport
-                  ? 'bg-blue-500 text-white ring-[2px] ring-offset-1 ring-blue-300 shadow-sm shadow-blue-200'
-                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-              }`}
+              className="inline-flex h-10 items-center justify-center gap-1 rounded-xl px-2.5 text-[11px] font-bold whitespace-nowrap break-keep transition-all active:scale-95 disabled:opacity-50 max-[420px]:h-9 max-[420px]:px-2 max-[420px]:text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100"
             >
               <FileSpreadsheet size={14} />
               <span className="whitespace-nowrap break-keep leading-none">가져오기</span>
