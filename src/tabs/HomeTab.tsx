@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
-import SlideOnboarding, { type OnboardingSlide } from '../components/onboarding/SlideOnboarding';
 import { Sparkles, ArrowUpRight, ArrowDownLeft, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,23 +12,6 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { openExternalUrl } from '../lib/openExternalUrl';
-
-const AI_ONBOARDING_KEY = 'heartbook-ai-onboarding-seen';
-
-const AI_SLIDES: OnboardingSlide[] = [
-  {
-    image: '/onboarding/maeum-onboarding-ai-01-parse.png',
-    imageAlt: 'AI 자동 입력 예시',
-    title: 'AI가 폼을 채워줘요',
-    body: '청첩장·부고장 링크나 이미지를 붙여넣으면 이름·날짜·장소를 자동으로 채워줘요.',
-  },
-  {
-    image: '/onboarding/maeum-onboarding-ai-02-amount.png',
-    imageAlt: '금액 추천 예시',
-    title: '금액도 추천해줘요',
-    body: '과거 내역과 관계를 분석해 보낼 금액을 추천해 드려요. 직접 수정도 가능해요.',
-  },
-];
 
 // 금액 추천 로직: 과거 이력·관계·장소를 분석해 상황별 문구 풀에서 매칭되는 구절을 랜덤 선택
 function recommendAmount(parsed: any, entries: EventEntry[]): { amt: number; reason: string } {
@@ -176,12 +158,6 @@ const defaultFormData = (): Partial<EventEntry> => ({
 export default function HomeTab() {
   const router = useRouter();
   const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName, refreshCredits } = useStore();
-
-  // AI 슬라이드 온보딩 + 첫 진입 강조
-  const [showAiOnboarding, setShowAiOnboarding] = useState(false);
-  const [highlightAiBanner, setHighlightAiBanner] = useState(() =>
-    typeof window !== 'undefined' && localStorage.getItem(AI_ONBOARDING_KEY) !== 'true'
-  );
 
   // AI 분석 시트
   const [showAiSheet, setShowAiSheet] = useState(false);
@@ -422,18 +398,6 @@ export default function HomeTab() {
 
   return (
     <div className="pb-24">
-      {showAiOnboarding && (
-        <SlideOnboarding
-          slides={AI_SLIDES}
-          doneLabel="분석 시작하기"
-          onClose={() => {
-            localStorage.setItem(AI_ONBOARDING_KEY, 'true');
-            setShowAiOnboarding(false);
-            setShowAiSheet(true);
-          }}
-        />
-      )}
-
       {/* 헤더 */}
       <div className="px-5 pt-8 pb-4 max-[360px]:px-4">
         <div className="flex items-center justify-between gap-3">
@@ -467,20 +431,8 @@ export default function HomeTab() {
         {/* AI 분석 배너 버튼 */}
         <button
           type="button"
-          onClick={() => {
-            setHighlightAiBanner(false);
-            const seen = typeof window !== 'undefined' && localStorage.getItem(AI_ONBOARDING_KEY) === 'true';
-            if (!seen) {
-              setShowAiOnboarding(true);
-            } else {
-              setShowAiSheet(true);
-            }
-          }}
-          className={`mt-4 w-full rounded-2xl bg-blue-500 px-4 py-3.5 text-left transition-all active:scale-[0.98] ${
-            highlightAiBanner
-              ? 'ring-[3px] ring-offset-2 ring-blue-300 shadow-lg shadow-blue-300/50'
-              : 'shadow-md shadow-blue-200'
-          }`}
+          onClick={() => setShowAiSheet(true)}
+          className="mt-4 w-full rounded-2xl bg-blue-500 px-4 py-3.5 text-left transition-all active:scale-[0.98] shadow-md shadow-blue-200"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
