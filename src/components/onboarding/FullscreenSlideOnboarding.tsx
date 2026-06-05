@@ -78,7 +78,8 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
       localStorage.setItem('heartbook-onboarding-seen', 'true');
       await loadFromSupabase();
       onComplete();
-    } catch {
+    } catch (e) {
+      console.error('[FullscreenSlideOnboarding] login error:', e);
       toast.error('로그인 중 오류가 발생했습니다.');
     } finally {
       setIsLogging(false);
@@ -90,7 +91,7 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
     onSkip();
   }, [onSkip]);
 
-  const slide = SLIDES[index];
+  const slide = SLIDES[index] as Slide | undefined;
 
   return (
     <div className="fixed inset-0 z-[500] flex flex-col bg-white">
@@ -119,11 +120,11 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
           ) : (
             <div className="relative flex-1 overflow-hidden bg-gray-100">
               <Image
-                src={slide.image}
-                alt={slide.imageAlt}
+                src={slide!.image}
+                alt={slide!.imageAlt}
                 fill
                 className="object-cover object-top"
-                priority={index === 0}
+                priority
               />
             </div>
           )}
@@ -155,10 +156,10 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
         </div>
 
         <h2 className="whitespace-pre-line text-[22px] font-black leading-snug text-gray-950">
-          {isCta ? '시작할 준비가\n됐어요' : slide.title}
+          {isCta ? '시작할 준비가\n됐어요' : slide!.title}
         </h2>
         <p className="mt-2 whitespace-pre-line break-keep text-[15px] font-semibold leading-relaxed text-gray-500">
-          {isCta ? '로그인하면 기록이 안전하게\n저장돼요' : slide.body}
+          {isCta ? '로그인하면 기록이 안전하게\n저장돼요' : slide!.body}
         </p>
 
         <button
