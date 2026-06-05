@@ -8,6 +8,7 @@ coverage/
 .env*
 !.env.example
 .vercel
+.superpowers/
 firebase-applet-config.json
 
 /src/generated/prisma
