@@ -95,6 +95,32 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
 
   return (
     <div className="fixed inset-0 z-[500] flex flex-col bg-white">
+      {/* 영구 크롬: 도트 + 건너뛰기 (슬라이드 전환과 무관하게 고정) */}
+      <div className="shrink-0 px-6 pb-3 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: CTA_INDEX + 1 }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all duration-200 ${
+                  i === index ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-200'
+                }`}
+              />
+            ))}
+          </div>
+          {!isCta && (
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="text-[13px] font-bold text-gray-400 active:text-gray-600"
+            >
+              건너뛰기
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 슬라이드 전환 영역: 이미지 + 텍스트 + 버튼이 함께 애니메이션 */}
       <AnimatePresence mode="wait">
         <motion.div
           key={index}
@@ -128,49 +154,26 @@ export default function FullscreenSlideOnboarding({ onComplete, onSkip }: Fullsc
               />
             </div>
           )}
-        </motion.div>
-      </AnimatePresence>
 
-      {/* 하단 고정 콘텐츠 */}
-      <div className="shrink-0 px-6 pb-[max(24px,env(safe-area-inset-bottom,24px))] pt-4">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: CTA_INDEX + 1 }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  i === index ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-200'
-                }`}
-              />
-            ))}
-          </div>
-          {!isCta && (
+          {/* 텍스트 + 버튼 */}
+          <div className="shrink-0 px-6 pb-[max(24px,env(safe-area-inset-bottom,24px))] pt-4">
+            <h2 className="whitespace-pre-line text-[22px] font-black leading-snug text-gray-950">
+              {isCta ? '시작할 준비가\n됐어요' : slide!.title}
+            </h2>
+            <p className="mt-2 whitespace-pre-line break-keep text-[15px] font-semibold leading-relaxed text-gray-500">
+              {isCta ? '로그인하면 기록이 안전하게\n저장돼요' : slide!.body}
+            </p>
             <button
               type="button"
-              onClick={handleSkip}
-              className="text-[13px] font-bold text-gray-400 active:text-gray-600"
+              onClick={isCta ? handleLogin : () => setIndex((i) => i + 1)}
+              disabled={isLogging}
+              className="mt-5 h-14 w-full rounded-2xl bg-blue-500 text-[16px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-60"
             >
-              건너뛰기
+              {isCta ? (isLogging ? '로그인 중...' : '토스로 시작하기') : '다음'}
             </button>
-          )}
-        </div>
-
-        <h2 className="whitespace-pre-line text-[22px] font-black leading-snug text-gray-950">
-          {isCta ? '시작할 준비가\n됐어요' : slide!.title}
-        </h2>
-        <p className="mt-2 whitespace-pre-line break-keep text-[15px] font-semibold leading-relaxed text-gray-500">
-          {isCta ? '로그인하면 기록이 안전하게\n저장돼요' : slide!.body}
-        </p>
-
-        <button
-          type="button"
-          onClick={isCta ? handleLogin : () => setIndex((i) => i + 1)}
-          disabled={isLogging}
-          className="mt-5 h-14 w-full rounded-2xl bg-blue-500 text-[16px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-60"
-        >
-          {isCta ? (isLogging ? '로그인 중...' : '토스로 시작하기') : '다음'}
-        </button>
-      </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
