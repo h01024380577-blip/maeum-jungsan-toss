@@ -19,7 +19,7 @@ const SLIDES: Slide[] = [
   {
     image: '/onboarding/maeum-ob-01.png',
     imageAlt: '마음정산 홈 화면',
-    title: '경조사 마음, 한눈에 정리해요',
+    title: '경조사 기록, 한눈에 정리해요',
     body: '주고받은 마음을 한곳에 기록하고 언제든 꺼내볼 수 있어요',
   },
   {
@@ -164,7 +164,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
                 />
                 <h2 className="mt-5 text-[28px] font-black text-gray-950">마음정산</h2>
                 <p className="mt-1.5 text-center text-[14px] font-medium text-gray-400">
-                  경조사 마음을 스마트하게 정리해요
+                  경조사 기록을 스마트하게 정리해요
                 </p>
 
                 {/* 핵심 기능 3가지 */}
