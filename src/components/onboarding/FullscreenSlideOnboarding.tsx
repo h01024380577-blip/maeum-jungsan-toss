@@ -196,22 +196,24 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
           ) : (
             <>
               {/* 기능 슬라이드: 폰 프레임 + 텍스트 + 버튼 */}
-              <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-blue-50 via-slate-50 to-slate-100 py-4">
-                <div
-                  className="relative overflow-hidden rounded-[36px] border-[8px] border-gray-900 shadow-[0_24px_64px_rgba(0,0,0,0.28)]"
-                  style={{ width: 'min(228px, 59vw)', aspectRatio: '624/1178' }}
-                >
-                  <Image
-                    src={slide!.image}
-                    alt={slide!.imageAlt}
-                    fill
-                    className="object-cover object-top"
-                    priority
-                    unoptimized
-                  />
+              <div className="relative min-h-0 flex-1 bg-gradient-to-b from-blue-50 via-slate-50 to-slate-100">
+                <div className="absolute inset-x-0 inset-y-3 flex items-center justify-center">
+                  <div
+                    className="relative overflow-hidden rounded-[36px] border-[8px] border-gray-900 shadow-[0_24px_64px_rgba(0,0,0,0.28)]"
+                    style={{ height: '100%', maxHeight: '430px', aspectRatio: '624/1178', maxWidth: 'min(228px, 59vw)' }}
+                  >
+                    <Image
+                      src={slide!.image}
+                      alt={slide!.imageAlt}
+                      fill
+                      className="object-cover object-top"
+                      priority
+                      unoptimized
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="shrink-0 px-6 pb-[max(24px,env(safe-area-inset-bottom,24px))] pt-4">
+              <div className="shrink-0 px-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] pt-3">
                 <h2 className="text-[22px] font-black leading-snug text-gray-950">{slide!.title}</h2>
                 <p className="mt-2 break-keep text-[15px] font-semibold leading-relaxed text-gray-500">{slide!.body}</p>
                 <button
