@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { ThemeProvider as TdsThemeProvider } from "@toss/tds-mobile";
 import { useStore } from "@/src/store/useStore";
-import IntroScreen from "@/src/components/onboarding/IntroScreen";
+import FullscreenSlideOnboarding from "@/src/components/onboarding/FullscreenSlideOnboarding";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
 
 const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
@@ -49,13 +49,16 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   }
 
   // 비로그인이면 무조건 온보딩 표시 (로그인 강제)
-  const showOnboarding = !tossUserId && !SKIP_ONBOARDING_PATHS.includes(pathname);
+  const showOnboarding = !tossUserId && !hasSeenOnboarding && !SKIP_ONBOARDING_PATHS.includes(pathname);
 
   return (
     <>
       {children}
       {showOnboarding && (
-        <IntroScreen onComplete={handleOnboardingComplete} />
+        <FullscreenSlideOnboarding
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingComplete}
+        />
       )}
       <Toaster
         position="top-center"
