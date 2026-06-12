@@ -1,5 +1,50 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useStore } from './useStore';
+import { apiFetch, getAuthToken } from '@/src/lib/apiClient';
+
+vi.mock('@/src/lib/apiClient', () => ({
+  apiFetch: vi.fn(),
+  clearAuthToken: vi.fn(),
+  getAuthToken: vi.fn(),
+  registerCreditRefreshHook: vi.fn(),
+}));
+
+const mockedApiFetch = vi.mocked(apiFetch);
+const mockedGetAuthToken = vi.mocked(getAuthToken);
+
+describe('useStore loadFromSupabase', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedApiFetch.mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 401 }),
+    );
+    useStore.setState({ isLoaded: false, entries: [], contacts: [], tossUserId: 'stale' });
+  });
+
+  it('skips /api/auth/me and loads immediately when no auth token (first entry)', async () => {
+    mockedGetAuthToken.mockReturnValue(null);
+
+    await useStore.getState().loadFromSupabase();
+
+    const state = useStore.getState();
+    expect(state.isLoaded).toBe(true);
+    expect(state.tossUserId).toBeNull();
+    expect(state.entries).toEqual([]);
+    // /api/auth/me는 호출하지 않아야 함 (refreshCredits의 /api/credits만 허용)
+    const calledPaths = mockedApiFetch.mock.calls.map(([url]) => String(url));
+    expect(calledPaths.some((u) => u.includes('/api/auth/me'))).toBe(false);
+  });
+
+  it('still checks /api/auth/me when a token exists', async () => {
+    mockedGetAuthToken.mockReturnValue('jwt-token');
+
+    await useStore.getState().loadFromSupabase();
+
+    const calledPaths = mockedApiFetch.mock.calls.map(([url]) => String(url));
+    expect(calledPaths.some((u) => u.includes('/api/auth/me'))).toBe(true);
+    expect(useStore.getState().isLoaded).toBe(true);
+  });
+});
 
 describe('useStore clearData', () => {
   it('clears auth-scoped data, credits, and analysis state', () => {

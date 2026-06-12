@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { apiFetch, clearAuthToken, registerCreditRefreshHook } from '@/src/lib/apiClient';
+import { apiFetch, clearAuthToken, getAuthToken, registerCreditRefreshHook } from '@/src/lib/apiClient';
 
 export type EventType = 'wedding' | 'funeral' | 'birthday' | 'other';
 export type TransactionType = 'INCOME' | 'EXPENSE';
@@ -133,6 +133,12 @@ export const useStore = create<AppState>()((set, get) => ({
 
   // API Route 기반 데이터 로드 (로그인 상태에서만)
   loadFromSupabase: async () => {
+    // 토큰 없는 첫 진입은 /api/auth/me가 401 확정 — 서버 왕복을 기다리지 않고 즉시 렌더
+    if (!getAuthToken()) {
+      set({ entries: [], contacts: [], tossUserId: null, tossUserName: null, notificationsEnabled: false, isLoaded: true });
+      get().refreshCredits();
+      return;
+    }
     try {
       // 로그인 여부 먼저 확인
       const meRes = await apiFetch('/api/auth/me');
