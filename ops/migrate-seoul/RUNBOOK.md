@@ -7,7 +7,7 @@
 
 ## 전제
 - 도메인 `maeum-jungsan.duckdns.org`는 유지 → AIT 번들의 `NEXT_PUBLIC_API_URL` 변경 불필요. 컷오버는 duckdns IP 변경뿐.
-- 기존 us-east-1 EC2에는 finproof(:3001)도 함께 떠 있으므로 **인스턴스를 내리지 말 것**. 마음정산만 이전.
+- 기존 us-east-1 EC2는 마음정산 전용 (nginx의 finproof-agent.conf는 FinProof가 별도 인스턴스 100.53.113.94로 이전하기 전의 잔재 — :3001에 프로세스 없음, 2026-06-12 확인). **컷오버 후 인스턴스 완전 종료 가능.**
 - 데이터 규모: User 411행 + Event/Transaction 수백 행 → pg_dump/restore 수 초.
 
 ## 사전 준비 (사용자 작업)
@@ -61,8 +61,8 @@ curl -sk https://<새IP>/api/health -H 'Host: maeum-jungsan.duckdns.org'
 - DB는 이미 신규를 바라보므로 전환 중 이중쓰기 없음. 전환 직전 `migrate-db.sh` 재실행으로 최신화.
 
 ### 8. 마무리
-- 기존 서버에서 `pm2 stop maeum-jungsan` (finproof는 유지).
-- 모니터링 1일 후 기존 프로세스 삭제. us-east-1 Supabase 프로젝트는 1주 보관 후 pause.
+- 기존 서버에서 `pm2 stop maeum-jungsan`.
+- 모니터링 1일 후 기존 us-east-1 인스턴스 자체를 stop → 1주 뒤 terminate (마음정산 전용이므로 비용 절감). us-east-1 Supabase 프로젝트는 1주 보관 후 pause.
 
 ## 롤백
 - duckdns IP를 기존 서버로 되돌리고 기존 pm2 재시작. DB를 되돌리려면 역방향 dump/restore (수 초).
