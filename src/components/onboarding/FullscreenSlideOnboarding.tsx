@@ -17,25 +17,25 @@ interface Slide {
 
 const SLIDES: Slide[] = [
   {
-    image: '/onboarding/maeum-ob-01.png',
+    image: '/onboarding/maeum-ob-01.webp',
     imageAlt: '마음정산 홈 화면',
     title: '경조사 기록, 한눈에 정리해요',
     body: '주고받은 마음을 한곳에 기록하고 언제든 꺼내볼 수 있어요',
   },
   {
-    image: '/onboarding/maeum-ob-02.png',
+    image: '/onboarding/maeum-ob-02.webp',
     imageAlt: 'AI 자동 입력 화면',
     title: '초대장 링크 하나로 자동 입력돼요',
     body: 'AI가 초대장 링크를 분석해서 내용을 자동으로 채우고 금액까지 추천해줘요',
   },
   {
-    image: '/onboarding/maeum-ob-03.png',
+    image: '/onboarding/maeum-ob-03.webp',
     imageAlt: '입금 내역 분석 화면',
     title: '받은 마음도 자동으로 정리해요',
     body: '입금내역이나 CSV 파일로 받은 마음을 한번에 가져올 수 있어요',
   },
   {
-    image: '/onboarding/maeum-ob-04.png',
+    image: '/onboarding/maeum-ob-04.webp',
     imageAlt: '관계별 통계 화면',
     title: '관계별 통계로 흐름을 파악해요',
     body: '누구에게 얼마나 마음을 주고받았는지 한눈에 볼 수 있어요',
