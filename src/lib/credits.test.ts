@@ -1,60 +1,80 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CREDITS_CONFIG,
-  kstStartOfToday,
   looksLikeTossUserKey,
   normalizeGuestDeviceId,
+  consumeAdPermission,
+  restoreAdPermission,
 } from './credits';
 
-describe('credits config', () => {
-  it('starts new users with 1 AI credit and keeps the AI reward cap aligned with bulk imports', () => {
-    expect(CREDITS_CONFIG.ai.welcome).toBe(1);
-    expect(CREDITS_CONFIG.csv.welcome).toBe(1);
-    expect(CREDITS_CONFIG.ai.cap).toBe(3);
-    expect(CREDITS_CONFIG.csv.cap).toBe(3);
-    expect(CREDITS_CONFIG.ai.welcome).toBeLessThan(CREDITS_CONFIG.ai.cap);
+vi.mock('@/src/lib/prisma', () => ({
+  prisma: {
+    adRewardGrant: {
+      updateMany: vi.fn(),
+    },
+  },
+}));
+
+import { prisma } from '@/src/lib/prisma';
+
+describe('CREDITS_CONFIG', () => {
+  it('has nonce TTL and active nonce limit for replay protection', () => {
+    expect(CREDITS_CONFIG.ad.nonceTtlMs).toBeGreaterThan(0);
+    expect(CREDITS_CONFIG.ad.activeNonceLimit).toBeGreaterThan(0);
   });
 });
 
-describe('kstStartOfToday', () => {
-  it('KST 00:00 이후 시각은 같은 KST 날짜의 00:00을 반환한다', () => {
-    // 2026-04-23 09:30 KST = 2026-04-23 00:30 UTC
-    const input = new Date('2026-04-23T00:30:00Z');
-    const result = kstStartOfToday(input);
-    // KST 2026-04-23 00:00 = UTC 2026-04-22 15:00
-    expect(result.toISOString()).toBe('2026-04-22T15:00:00.000Z');
+describe('consumeAdPermission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('UTC 자정 직후(KST 오전 9시)도 같은 KST 날짜의 00:00을 반환한다', () => {
-    // 2026-04-23 00:01 UTC = 2026-04-23 09:01 KST
-    const input = new Date('2026-04-23T00:01:00Z');
-    const result = kstStartOfToday(input);
-    expect(result.toISOString()).toBe('2026-04-22T15:00:00.000Z');
+  it('returns true when a REDEEMED grant is transitioned to CONSUMED', async () => {
+    vi.mocked(prisma.adRewardGrant.updateMany).mockResolvedValue({ count: 1 });
+
+    const result = await consumeAdPermission('user-1', 'AI_CREDIT', 'nonce-abc');
+
+    expect(result).toBe(true);
+    expect(prisma.adRewardGrant.updateMany).toHaveBeenCalledWith({
+      where: { rewardNonce: 'nonce-abc', userId: 'user-1', rewardType: 'AI_CREDIT', status: 'REDEEMED' },
+      data: { status: 'CONSUMED' },
+    });
   });
 
-  it('UTC 14:59(KST 23:59)에는 당일 KST 00:00을 반환한다', () => {
-    // 2026-04-22 14:59 UTC = 2026-04-22 23:59 KST
-    const input = new Date('2026-04-22T14:59:00Z');
-    const result = kstStartOfToday(input);
-    // KST 2026-04-22 00:00 = UTC 2026-04-21 15:00
-    expect(result.toISOString()).toBe('2026-04-21T15:00:00.000Z');
+  it('returns false when no REDEEMED grant matches (ad not watched or nonce already used)', async () => {
+    vi.mocked(prisma.adRewardGrant.updateMany).mockResolvedValue({ count: 0 });
+
+    const result = await consumeAdPermission('user-1', 'AI_CREDIT', 'nonce-missing');
+
+    expect(result).toBe(false);
   });
 
-  it('UTC 15:00(KST 자정) 직전과 직후는 다른 KST 날짜를 반환한다', () => {
-    const justBefore = kstStartOfToday(new Date('2026-04-22T14:59:59Z'));
-    const justAfter = kstStartOfToday(new Date('2026-04-22T15:00:00Z'));
-    expect(justBefore.toISOString()).toBe('2026-04-21T15:00:00.000Z');
-    expect(justAfter.toISOString()).toBe('2026-04-22T15:00:00.000Z');
-    // 정확히 24시간 차이
-    expect(justAfter.getTime() - justBefore.getTime()).toBe(24 * 60 * 60 * 1000);
+  it('works for CSV_CREDIT reward type', async () => {
+    vi.mocked(prisma.adRewardGrant.updateMany).mockResolvedValue({ count: 1 });
+
+    const result = await consumeAdPermission('user-2', 'CSV_CREDIT', 'nonce-csv');
+
+    expect(result).toBe(true);
+    expect(prisma.adRewardGrant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ rewardType: 'CSV_CREDIT' }) }),
+    );
+  });
+});
+
+describe('restoreAdPermission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('반환값의 밀리초는 0으로 초기화된다', () => {
-    const result = kstStartOfToday(new Date('2026-04-23T05:23:45.678Z'));
-    expect(result.getUTCMilliseconds()).toBe(0);
-    expect(result.getUTCSeconds()).toBe(0);
-    expect(result.getUTCMinutes()).toBe(0);
-    expect(result.getUTCHours()).toBe(15);
+  it('transitions a CONSUMED grant back to REDEEMED for retry', async () => {
+    vi.mocked(prisma.adRewardGrant.updateMany).mockResolvedValue({ count: 1 });
+
+    await restoreAdPermission('user-1', 'AI_CREDIT', 'nonce-abc');
+
+    expect(prisma.adRewardGrant.updateMany).toHaveBeenCalledWith({
+      where: { rewardNonce: 'nonce-abc', userId: 'user-1', rewardType: 'AI_CREDIT', status: 'CONSUMED' },
+      data: { status: 'REDEEMED' },
+    });
   });
 });
 

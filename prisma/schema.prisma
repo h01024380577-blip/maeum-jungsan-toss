@@ -20,12 +20,6 @@ model User {
   notificationsEnabled Boolean   @default(false)
   sessionVersion       Int       @default(0)
 
-  // 크레딧 시스템 (2026-04-23 도입)
-  aiCredits        Int      @default(1) // AI 분석 영구 잔고, 웰컴 1회
-  csvImportCredits Int      @default(1) // CSV 가져오기 영구 잔고, 웰컴 1회
-  adWatchesToday   Int      @default(0) // 오늘 본 리워드 광고 횟수 (AI/CSV 공용)
-  adWatchesResetAt DateTime @default(now())
-
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -44,6 +38,7 @@ enum RewardType {
 enum GrantStatus {
   ISSUED
   REDEEMED
+  CONSUMED
   EXPIRED
   REJECTED
 }

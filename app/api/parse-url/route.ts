@@ -14,10 +14,9 @@ import {
   LOW_CONFIDENCE_RESPONSE,
 } from '@/src/lib/geminiHelpers';
 import {
-  consumeCredit,
-  refundCredit,
+  consumeAdPermission,
+  restoreAdPermission,
   resolveDbUserId,
-  isGuardEnabled,
 } from '@/src/lib/credits';
 
 export async function OPTIONS(req: NextRequest) {
@@ -59,7 +58,6 @@ const OUTPUT_SCHEMA = `{
 }`;
 
 function normalizeData(parsed: any) {
-  // suggestedNames / suggestedAccounts 보존
   const result: any = {
     eventType: parsed.eventType || 'other',
     targetName: parsed.targetName || '',
@@ -82,10 +80,6 @@ function calculateConfidence(data: any): 'high' | 'medium' | 'low' {
   return calculateConfidenceFromFields([data.targetName, data.date, data.location]);
 }
 
-/**
- * Jina Reader API로 JS 렌더링된 페이지 텍스트 가져오기
- * SPA 사이트에서도 실제 콘텐츠를 추출할 수 있음
- */
 async function fetchRenderedText(url: string): Promise<string | null> {
   try {
     const res = await fetch(`https://r.jina.ai/${url}`, {
@@ -94,7 +88,6 @@ async function fetchRenderedText(url: string): Promise<string | null> {
     });
     if (!res.ok) return null;
     const text = await res.text();
-    // Markdown 이미지 태그 제거, 3000자 제한
     return text
       .replace(/!\[.*?\]\(.*?\)/g, '')
       .replace(/\[Image.*?\]/g, '')
@@ -110,6 +103,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const rawUrl = body?.url;
+    const permissionNonce = typeof body?.permissionNonce === 'string' ? body.permissionNonce : '';
 
     if (!rawUrl || typeof rawUrl !== 'string') {
       return withCors(request, NextResponse.json(
@@ -135,23 +129,26 @@ export async function POST(request: NextRequest) {
       ));
     }
 
-    // AI 크레딧 가드 (env로 on/off)
-    let aiCreditUserId: string | null = null;
-    if (isGuardEnabled('AI_CREDIT')) {
-      aiCreditUserId = await resolveDbUserId(request);
-      if (!aiCreditUserId) {
-        return withCors(request, NextResponse.json(
-          { success: false, reason: 'unauthorized' },
-          { status: 401 },
-        ));
-      }
-      const consumed = await consumeCredit(aiCreditUserId, 'AI_CREDIT');
-      if (!consumed) {
-        return withCors(request, NextResponse.json(
-          { success: false, reason: 'no_credits', rewardType: 'AI_CREDIT' },
-          { status: 402 },
-        ));
-      }
+    // nonce 기반 광고 시청 확인
+    const userId = await resolveDbUserId(request);
+    if (!userId) {
+      return withCors(request, NextResponse.json(
+        { success: false, reason: 'unauthorized' },
+        { status: 401 },
+      ));
+    }
+    if (!permissionNonce) {
+      return withCors(request, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+        { status: 402 },
+      ));
+    }
+    const permitted = await consumeAdPermission(userId, 'AI_CREDIT', permissionNonce);
+    if (!permitted) {
+      return withCors(request, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+        { status: 402 },
+      ));
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -201,7 +198,7 @@ export async function POST(request: NextRequest) {
       } catch (e: any) {
         console.error('[parse-url] Phase 1a error:', e?.message);
         if (isTransientGeminiError(e)) {
-          if (aiCreditUserId) await refundCredit(aiCreditUserId, 'AI_CREDIT');
+          await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
           return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
         }
       }
@@ -234,7 +231,7 @@ ${OUTPUT_SCHEMA}`;
     } catch (e: any) {
       console.error('[parse-url] Phase 2 (Jina) error:', e?.message);
       if (isTransientGeminiError(e)) {
-        if (aiCreditUserId) await refundCredit(aiCreditUserId, 'AI_CREDIT');
+        await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
         return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
       }
     }
@@ -257,10 +254,7 @@ ${OUTPUT_SCHEMA}`;
       const data = normalizeData(parseAiResponse(response.text || '{}'));
       const confidence = calculateConfidence(data);
 
-      // 핵심 필드(targetName/date/location)가 모두 비어있다면 사용자에게
-      // 아무 가치도 없는 결과이므로 크레딧 환불 + 명시 응답.
       if (!hasMeaningfulData(data)) {
-        if (aiCreditUserId) await refundCredit(aiCreditUserId, 'AI_CREDIT');
         return withCors(request, NextResponse.json(LOW_CONFIDENCE_RESPONSE, { status: 200 }));
       }
 
@@ -268,7 +262,7 @@ ${OUTPUT_SCHEMA}`;
     } catch (e: any) {
       console.error('[parse-url] Phase 3 error:', e?.message);
       if (isTransientGeminiError(e)) {
-        if (aiCreditUserId) await refundCredit(aiCreditUserId, 'AI_CREDIT');
+        await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
         return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
       }
       return withCors(request, NextResponse.json(

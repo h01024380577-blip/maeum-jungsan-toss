@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * 크레딧 소진 시 광고 시청 여부를 묻는 확인 다이얼로그.
+ * 기능 사용 전 광고 시청을 안내하는 다이얼로그.
  * - 취소 시: onClose
- * - 광고 보기 시: 내부 RewardedAdButton이 사전 로드된 광고를 nonce→show→redeem 순서로 처리,
- *   onCharged 콜백으로 자동 닫힘
+ * - 광고 완료 시: RewardedAdButton이 nonce를 발급하고 onGranted(nonce)를 호출
+ *   → 호출자가 nonce를 기능 API에 포함시켜 기능 실행
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { PlayCircle } from 'lucide-react';
 import RewardedAdButton from './RewardedAdButton';
 import type { RewardType } from '@prisma/client';
 
@@ -16,21 +16,28 @@ interface Props {
   open: boolean;
   onClose: () => void;
   rewardType: RewardType;
-  /** 충전 성공 후 사용자가 바로 재시도할 수 있도록 호출자가 실행할 로직 */
-  onChargedAndResume?: () => void;
+  /** 광고 시청 완료 후 nonce를 전달 — 호출자가 기능 API에 포함 */
+  onGranted: (nonce: string) => void;
 }
 
-const MESSAGES: Record<RewardType, string> = {
-  AI_CREDIT: 'AI 분석 횟수를 다 썼어요.\n광고를 보고 1회 더 받을까요?',
-  CSV_CREDIT: '대량 가져오기 횟수를 다 썼어요.\n광고를 보고 1회 더 받을까요?',
+const MESSAGES: Record<RewardType, { title: string; desc: string }> = {
+  AI_CREDIT: {
+    title: 'AI 분석을 시작할까요?',
+    desc: '짧은 광고를 보고\nAI 분석을 바로 시작해요.',
+  },
+  CSV_CREDIT: {
+    title: '대량 가져오기를 시작할까요?',
+    desc: '짧은 광고를 보고\n대량 가져오기를 바로 시작해요.',
+  },
 };
 
 export default function AdPromptDialog({
   open,
   onClose,
   rewardType,
-  onChargedAndResume,
+  onGranted,
 }: Props) {
+  const msg = MESSAGES[rewardType];
   return (
     <AnimatePresence>
       {open && (
@@ -50,12 +57,15 @@ export default function AdPromptDialog({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-center mb-3">
-              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                <AlertCircle size={20} className="text-amber-600" />
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <PlayCircle size={22} className="text-blue-600" />
               </div>
             </div>
-            <p className="text-[14px] font-bold text-gray-800 text-center mb-5 whitespace-pre-line leading-relaxed">
-              {MESSAGES[rewardType]}
+            <p className="text-[15px] font-bold text-gray-800 text-center mb-1">
+              {msg.title}
+            </p>
+            <p className="text-[13px] text-gray-500 text-center mb-5 whitespace-pre-line leading-relaxed">
+              {msg.desc}
             </p>
             <div className="flex gap-2.5">
               <button
@@ -63,14 +73,14 @@ export default function AdPromptDialog({
                 onClick={onClose}
                 className="flex-1 py-3 rounded-xl text-sm font-bold text-gray-500 bg-gray-100 active:scale-[0.97] transition-all"
               >
-                다음에
+                취소
               </button>
               <RewardedAdButton
                 rewardType={rewardType}
                 label="광고 보기"
-                onCharged={() => {
+                onGranted={(nonce) => {
                   onClose();
-                  onChargedAndResume?.();
+                  onGranted(nonce);
                 }}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed"
               />

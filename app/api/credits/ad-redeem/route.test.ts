@@ -8,13 +8,13 @@ vi.mock('@/src/lib/prisma', () => ({
 }));
 
 vi.mock('@/src/lib/credits', () => ({
-  CREDITS_CONFIG: {
-    ai: { cap: 3, rewardAmount: 1 },
-    csv: { cap: 3, rewardAmount: 1 },
-    ad: { dailyLimit: 10, nonceTtlMs: 5 * 60 * 1000, activeNonceLimit: 3 },
-  },
   isAllowedRewardAdGroupId: vi.fn(),
   resolveDbUserId: vi.fn(),
+}));
+
+vi.mock('@/src/lib/cors', () => ({
+  corsResponse: vi.fn().mockResolvedValue(new Response()),
+  withCors: (_req: unknown, res: Response) => res,
 }));
 
 import { prisma } from '@/src/lib/prisma';
@@ -28,7 +28,7 @@ const issuedGrant = {
   rewardNonce: 'nonce-1',
   rewardType: 'AI_CREDIT',
   rewardAmount: 1,
-  status: 'REDEEMED',
+  status: 'ISSUED',
   expiresAt: new Date(Date.now() + 60_000),
 };
 
@@ -47,15 +47,6 @@ function makeTx(overrides: Record<string, any> = {}) {
       update: vi.fn().mockResolvedValue({}),
       ...overrides.adRewardGrant,
     },
-    user: {
-      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-      findUnique: vi.fn().mockResolvedValue({
-        aiCredits: 1,
-        csvImportCredits: 0,
-        adWatchesToday: 1,
-      }),
-      ...overrides.user,
-    },
   };
 }
 
@@ -66,29 +57,15 @@ describe('/api/credits/ad-redeem POST', () => {
     vi.mocked(isAllowedRewardAdGroupId).mockReturnValue(true);
   });
 
-  it('claims the nonce atomically before incrementing credits', async () => {
-    const calls: string[] = [];
-    const tx = makeTx({
-      adRewardGrant: {
-        updateMany: vi.fn().mockImplementation(async () => {
-          calls.push('claim');
-          return { count: 1 };
-        }),
-      },
-      user: {
-        updateMany: vi.fn().mockImplementation(async () => {
-          calls.push('credit');
-          return { count: 1 };
-        }),
-      },
-    });
+  it('transitions ISSUED → REDEEMED and returns permissionReady: true', async () => {
+    const tx = makeTx();
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
 
     const response = await POST(makeRequest({ nonce: 'nonce-1' }));
     const json = await response.json();
 
     expect(response.status).toBe(200);
-    expect(json).toMatchObject({ success: true, rewardType: 'AI_CREDIT', granted: 1 });
+    expect(json).toMatchObject({ success: true, rewardType: 'AI_CREDIT', permissionReady: true });
     expect(tx.adRewardGrant.updateMany).toHaveBeenCalledWith({
       where: {
         rewardNonce: 'nonce-1',
@@ -98,42 +75,31 @@ describe('/api/credits/ad-redeem POST', () => {
       },
       data: { status: 'REDEEMED', redeemedAt: expect.any(Date) },
     });
-    expect(calls).toEqual(['claim', 'credit']);
   });
 
-  it('rejects redeem when the daily ad limit was reached after nonce issuance', async () => {
+  it('returns 404 when nonce is not found', async () => {
     const tx = makeTx({
-      user: {
+      adRewardGrant: {
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-        findUnique: vi.fn().mockResolvedValue({
-          aiCredits: 0,
-          csvImportCredits: 0,
-          adWatchesToday: 10,
-        }),
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
       },
     });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
 
-    const response = await POST(makeRequest({ nonce: 'nonce-1' }));
+    const response = await POST(makeRequest({ nonce: 'nonce-missing' }));
     const json = await response.json();
 
-    expect(response.status).toBe(429);
-    expect(json).toEqual({ success: false, reason: 'daily_ad_limit' });
-    expect(tx.adRewardGrant.update).toHaveBeenCalledWith({
-      where: { id: 'grant-1' },
-      data: { status: 'REJECTED' },
-    });
+    expect(response.status).toBe(404);
+    expect(json).toMatchObject({ success: false, reason: 'nonce_not_found' });
   });
 
-  it('rejects redeem when the AI credit balance reached the AI cap after nonce issuance', async () => {
+  it('returns 409 when nonce was already used (not ISSUED)', async () => {
     const tx = makeTx({
-      user: {
+      adRewardGrant: {
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-        findUnique: vi.fn().mockResolvedValue({
-          aiCredits: 3,
-          csvImportCredits: 0,
-          adWatchesToday: 0,
-        }),
+        findUnique: vi.fn().mockResolvedValue({ ...issuedGrant, status: 'REDEEMED' }),
+        update: vi.fn(),
       },
     });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
@@ -142,9 +108,43 @@ describe('/api/credits/ad-redeem POST', () => {
     const json = await response.json();
 
     expect(response.status).toBe(409);
-    expect(json).toEqual({ success: false, reason: 'cap_reached' });
+    expect(json).toMatchObject({ success: false, reason: 'nonce_already_used' });
+  });
+
+  it('returns 410 when nonce has expired', async () => {
+    const expiredGrant = { ...issuedGrant, status: 'ISSUED', expiresAt: new Date(Date.now() - 1000) };
+    const tx = makeTx({
+      adRewardGrant: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        findUnique: vi.fn().mockResolvedValue(expiredGrant),
+        update: vi.fn().mockResolvedValue({}),
+      },
+    });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
+
+    const response = await POST(makeRequest({ nonce: 'nonce-1' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(410);
+    expect(json).toMatchObject({ success: false, reason: 'nonce_expired' });
     expect(tx.adRewardGrant.update).toHaveBeenCalledWith({
-      where: { id: 'grant-1' },
+      where: { id: expiredGrant.id },
+      data: { status: 'EXPIRED' },
+    });
+  });
+
+  it('rejects invalid ad group id and marks grant REJECTED', async () => {
+    vi.mocked(isAllowedRewardAdGroupId).mockReturnValue(false);
+    const tx = makeTx();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(tx));
+
+    const response = await POST(makeRequest({ nonce: 'nonce-1' }));
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json).toMatchObject({ success: false, reason: 'invalid_ad_group_id' });
+    expect(tx.adRewardGrant.update).toHaveBeenCalledWith({
+      where: { id: issuedGrant.id },
       data: { status: 'REJECTED' },
     });
   });

@@ -3,9 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/src/lib/prisma', () => ({
   prisma: {
-    user: {
-      findUnique: vi.fn(),
-    },
     adRewardGrant: {
       count: vi.fn(),
       create: vi.fn(),
@@ -15,17 +12,19 @@ vi.mock('@/src/lib/prisma', () => ({
 
 vi.mock('@/src/lib/credits', () => ({
   CREDITS_CONFIG: {
-    ai: { cap: 3, rewardAmount: 1 },
-    csv: { cap: 3, rewardAmount: 1 },
-    ad: { dailyLimit: 10, nonceTtlMs: 5 * 60 * 1000, activeNonceLimit: 3 },
+    ad: { nonceTtlMs: 5 * 60 * 1000, activeNonceLimit: 3 },
   },
   isAllowedRewardAdGroupId: vi.fn(),
-  resetAdWatchesIfNeeded: vi.fn(),
   resolveDbUserId: vi.fn(),
 }));
 
+vi.mock('@/src/lib/cors', () => ({
+  corsResponse: vi.fn().mockResolvedValue(new Response()),
+  withCors: (_req: unknown, res: Response) => res,
+}));
+
 import { prisma } from '@/src/lib/prisma';
-import { isAllowedRewardAdGroupId, resetAdWatchesIfNeeded, resolveDbUserId } from '@/src/lib/credits';
+import { isAllowedRewardAdGroupId, resolveDbUserId } from '@/src/lib/credits';
 import { POST } from './route';
 
 function makeRequest(body: Record<string, unknown>) {
@@ -39,17 +38,21 @@ describe('/api/credits/ad-nonce POST', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveDbUserId).mockResolvedValue('user-1');
-    vi.mocked(resetAdWatchesIfNeeded).mockResolvedValue({
-      adWatchesToday: 0,
-      adWatchesResetAt: new Date('2026-05-15T00:00:00.000Z'),
-    });
     vi.mocked(isAllowedRewardAdGroupId).mockReturnValue(true);
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      aiCredits: 0,
-      csvImportCredits: 0,
-    } as any);
     vi.mocked(prisma.adRewardGrant.count).mockResolvedValue(0);
     vi.mocked(prisma.adRewardGrant.create).mockResolvedValue({ id: 'grant-1' } as any);
+  });
+
+  it('issues a nonce when all checks pass', async () => {
+    const response = await POST(makeRequest({
+      rewardType: 'AI_CREDIT',
+      adGroupId: 'ait.valid.rewarded',
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toMatchObject({ nonce: expect.any(String), rewardType: 'AI_CREDIT', expiresAt: expect.any(String) });
+    expect(prisma.adRewardGrant.create).toHaveBeenCalled();
   });
 
   it('rejects ad group ids that are not allowed for the reward type', async () => {
@@ -80,20 +83,11 @@ describe('/api/credits/ad-nonce POST', () => {
     expect(prisma.adRewardGrant.create).not.toHaveBeenCalled();
   });
 
-  it('rejects AI reward ad issuance when the balance is already at the AI cap', async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      aiCredits: 3,
-      csvImportCredits: 1,
-    } as any);
-
-    const response = await POST(makeRequest({
-      rewardType: 'AI_CREDIT',
-      adGroupId: 'ait.valid.rewarded',
-    }));
+  it('rejects missing reward type', async () => {
+    const response = await POST(makeRequest({ adGroupId: 'ait.valid.rewarded' }));
     const json = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(json).toEqual({ error: 'cap_reached_ai' });
-    expect(prisma.adRewardGrant.create).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: 'invalid_reward_type' });
   });
 });

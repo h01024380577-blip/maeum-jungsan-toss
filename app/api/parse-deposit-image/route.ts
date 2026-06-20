@@ -4,7 +4,8 @@ import { GoogleGenAI } from '@google/genai';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import { isRateLimitError, parseAiResponse, RATE_LIMIT_RESPONSE } from '@/src/lib/geminiHelpers';
 import { normalizeDepositImageBatch } from '@/src/lib/parseDepositImage';
-import { consumeCredit, isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
+import { consumeAdPermission } from '@/src/lib/credits';
+import { resolveDbUserId } from '@/src/lib/credits';
 import { mintCsvCreditBypassToken } from '@/src/lib/importCreditToken';
 
 export async function OPTIONS(req: NextRequest) {
@@ -48,10 +49,27 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => null);
     const image = body?.image;
+    const permissionNonce = typeof body?.permissionNonce === 'string' ? body.permissionNonce : '';
+
     if (typeof image !== 'string' || image.trim().length < 20) {
       return withCors(req, NextResponse.json(
         { success: false, reason: 'invalid_input', message: '입금내역 캡처 이미지를 선택해주세요.' },
         { status: 400 },
+      ));
+    }
+
+    if (!permissionNonce) {
+      return withCors(req, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
+        { status: 402 },
+      ));
+    }
+
+    const permitted = await consumeAdPermission(userId, 'CSV_CREDIT', permissionNonce);
+    if (!permitted) {
+      return withCors(req, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
+        { status: 402 },
       ));
     }
 
@@ -63,7 +81,6 @@ export async function POST(req: NextRequest) {
       ));
     }
 
-    const guardOn = isGuardEnabled('CSV_CREDIT');
     const { data, mimeType } = splitImageDataUri(image);
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
@@ -80,21 +97,11 @@ export async function POST(req: NextRequest) {
     const parsed = parseAiResponse(response.text || '{}');
     const normalized = normalizeDepositImageBatch(parsed);
 
-    if (guardOn) {
-      const consumed = await consumeCredit(userId, 'CSV_CREDIT');
-      if (!consumed) {
-        return withCors(req, NextResponse.json(
-          { success: false, reason: 'no_credits', rewardType: 'CSV_CREDIT', message: '대량 가져오기 크레딧이 부족합니다.' },
-          { status: 402 },
-        ));
-      }
-    }
-
     return withCors(req, NextResponse.json({
       success: true,
       data: normalized,
       source: 'gemini-image',
-      creditToken: guardOn ? mintCsvCreditBypassToken(userId) : null,
+      creditToken: mintCsvCreditBypassToken(userId),
     }));
   } catch (e: unknown) {
     console.error('[parse-deposit-image] error:', (e as Error)?.message);

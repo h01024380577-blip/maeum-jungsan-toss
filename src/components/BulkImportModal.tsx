@@ -120,7 +120,7 @@ interface Props {
 }
 
 export default function BulkImportModal({ isOpen, onClose }: Props) {
-  const { bulkAddEntries, refreshCredits } = useStore();
+  const { bulkAddEntries } = useStore();
   const [step, setStep] = useState<'upload' | 'fileOptions' | 'mapping' | 'preview' | 'depositReview'>('upload');
   const [csvData, setCsvData] = useState<RawCSVData | null>(null);
   const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
@@ -135,6 +135,9 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [adPromptOpen, setAdPromptOpen] = useState(false);
+  // 광고 다이얼로그가 열렸을 때 대기 중인 액션 타입
+  const [pendingAdAction, setPendingAdAction] = useState<'image' | 'import' | null>(null);
+  const [pendingImageData, setPendingImageData] = useState<string | null>(null);
   const [aiState, setAiState] = useState<'idle' | 'mapping' | 'success' | 'failed'>('idle');
   const [aiReason, setAiReason] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'general' | 'backup' | 'deposit'>('general');
@@ -204,21 +207,18 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
-  const analyzeDepositImage = async (imageData: string) => {
+  const analyzeDepositImage = async (imageData: string, permissionNonce: string) => {
     setError(null);
     setIsAnalyzingDeposit(true);
     try {
       const res = await apiFetch('/api/parse-deposit-image', {
         method: 'POST',
-        body: JSON.stringify({ image: imageData }),
+        body: JSON.stringify({ image: imageData, permissionNonce }),
       });
       const json: any = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         const reason = json?.reason;
-        if (reason === 'no_credits') {
-          setError(null);
-          setAdPromptOpen(true);
-        } else if (reason === 'unauthorized') {
+        if (reason === 'unauthorized') {
           setError('로그인이 필요해요.');
         } else if (reason === 'rate_limit') {
           setError(json.message || '잠시 후 다시 시도해주세요.');
@@ -245,6 +245,12 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
+  const startDepositAnalysis = (imageData: string) => {
+    setPendingImageData(imageData);
+    setPendingAdAction('image');
+    setAdPromptOpen(true);
+  };
+
   const handleDepositFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -257,7 +263,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         setError('이미지를 읽지 못했어요. 다시 선택해 주세요.');
         return;
       }
-      analyzeDepositImage(imageData);
+      startDepositAnalysis(imageData);
     };
     reader.onerror = () => setError('이미지를 읽지 못했어요. 다시 선택해 주세요.');
     reader.readAsDataURL(file);
@@ -281,7 +287,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
         setError('사진을 가져오지 못했어요. 다시 선택해 주세요.');
         return;
       }
-      await analyzeDepositImage(imageData);
+      startDepositAnalysis(imageData);
     } catch {
       setError('앨범을 열 수 없습니다. 다시 시도해 주세요.');
     }
@@ -320,10 +326,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
-  // 모달 오픈 시 최신 크레딧 상태 동기화
-  useEffect(() => {
-    if (isOpen) refreshCredits();
-  }, [isOpen, refreshCredits]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -424,6 +426,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setDepositRows((prev) => prev.map((row) => ({ ...row, _selected: nextSelected })));
   };
 
+  // 입금 이미지 분석 후 대량가져오기 — bypass token으로 광고 없이 실행
   const handleDepositImport = async () => {
     const today = new Date().toISOString().split('T')[0];
     const processed = buildDepositBulkEntries(depositRows.map((row) => ({
@@ -466,18 +469,24 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       reset();
       return result;
     } catch (err: any) {
-      if (err?.status === 402 || err?.reason === 'no_credits') {
-        setError(null);
-        setAdPromptOpen(true);
-      } else {
-        setError(err?.message || '가져오기에 실패했어요. 잠시 후 다시 시도해 주세요.');
-      }
+      setError(err?.message || '가져오기에 실패했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleImport = async () => {
+  // 일반/백업 CSV 가져오기 — 광고 시청 후 nonce로 실행
+  const startImport = () => {
+    const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
+    if (processed.length === 0) {
+      setError('가져올 유효한 데이터가 없습니다.');
+      return;
+    }
+    setPendingAdAction('import');
+    setAdPromptOpen(true);
+  };
+
+  const handleImport = async (permissionNonce: string) => {
     const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
     if (processed.length === 0) {
       setError('가져올 유효한 데이터가 없습니다.');
@@ -486,7 +495,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
 
     setIsImporting(true);
     try {
-      const result = await bulkAddEntries(processed as any);
+      const result = await bulkAddEntries(processed as any, { permissionNonce });
       if (result.inserted > 0) {
         toast.success(`${result.inserted}건을 가져왔어요`, {
           description: result.skipped > 0
@@ -505,12 +514,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       reset();
       return result;
     } catch (err: any) {
-      if (err?.status === 402 || err?.reason === 'no_credits') {
-        setError(null);
-        setAdPromptOpen(true);
-      } else {
-        setError(err?.message || '가져오기에 실패했어요. 잠시 후 다시 시도해 주세요.');
-      }
+      setError(err?.message || '가져오기에 실패했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsImporting(false);
     }
@@ -536,6 +540,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setDepositRows([]);
     setDepositCreditToken(null);
     setIsAnalyzingDeposit(false);
+    setPendingAdAction(null);
+    setPendingImageData(null);
   };
 
   const handleClose = () => {
@@ -1109,7 +1115,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
                     이전으로
                   </button>
                   <button
-                    onClick={handleImport}
+                    onClick={startImport}
                     disabled={isImporting}
                     className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
@@ -1128,8 +1134,18 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
           </motion.div>
           <AdPromptDialog
             open={adPromptOpen}
-            onClose={() => setAdPromptOpen(false)}
+            onClose={() => { setAdPromptOpen(false); setPendingAdAction(null); setPendingImageData(null); }}
             rewardType="CSV_CREDIT"
+            onGranted={(nonce) => {
+              setAdPromptOpen(false);
+              if (pendingAdAction === 'image' && pendingImageData) {
+                analyzeDepositImage(pendingImageData, nonce);
+              } else if (pendingAdAction === 'import') {
+                handleImport(nonce);
+              }
+              setPendingAdAction(null);
+              setPendingImageData(null);
+            }}
           />
         </>
       )}

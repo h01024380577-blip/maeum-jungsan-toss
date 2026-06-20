@@ -6,7 +6,6 @@ import { Settings } from 'lucide-react';
 import { useStore } from '@/src/store/useStore';
 
 import ProfileCard from '@/src/components/mypage/ProfileCard';
-import CreditOverview from '@/src/components/mypage/CreditOverview';
 import StatsOverview from '@/src/components/mypage/StatsOverview';
 import SettingsSheet from '@/src/components/mypage/SettingsSheet';
 import InlineBanner from '@/src/components/ads/InlineBanner';
@@ -49,15 +48,7 @@ export default function MyPageTab() {
         {/* ① 프로필 */}
         <ProfileCard />
 
-        {/* ② 내 크레딧 */}
-        <section>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">
-            내 크레딧
-          </p>
-          <CreditOverview />
-        </section>
-
-        {/* ③ 나의 통계 */}
+        {/* ② 나의 통계 */}
         <section>
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">
             나의 통계

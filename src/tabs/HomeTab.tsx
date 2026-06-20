@@ -157,7 +157,7 @@ const defaultFormData = (): Partial<EventEntry> => ({
 
 export default function HomeTab() {
   const router = useRouter();
-  const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName, refreshCredits } = useStore();
+  const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName } = useStore();
 
   // AI 분석 시트
   const [showAiSheet, setShowAiSheet] = useState(false);
@@ -165,6 +165,7 @@ export default function HomeTab() {
   const [aiSelectedImage, setAiSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [adPromptOpen, setAdPromptOpen] = useState(false);
+  const [pendingAiParams, setPendingAiParams] = useState<{ type: 'url' | 'image'; data: string } | null>(null);
 
   // 메인 폼 상태
   const [formData, setFormData] = useState<Partial<EventEntry>>(defaultFormData());
@@ -204,7 +205,7 @@ export default function HomeTab() {
         return;
       }
       setAiSelectedImage(imageData);
-      handleAiParse({ type: 'image', data: imageData });
+      startAiParse({ type: 'image', data: imageData });
     } catch {
       toast.error('카메라를 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
@@ -225,7 +226,7 @@ export default function HomeTab() {
         return;
       }
       setAiSelectedImage(imageData);
-      handleAiParse({ type: 'image', data: imageData });
+      startAiParse({ type: 'image', data: imageData });
     } catch {
       toast.error('앨범을 열 수 없습니다. 다시 시도해 주세요.', { duration: 3000, icon: <AlertCircle size={16} /> });
     }
@@ -242,22 +243,28 @@ export default function HomeTab() {
           return;
         }
         setAiSelectedImage(imageData);
-        handleAiParse({ type: 'image', data: imageData });
+        startAiParse({ type: 'image', data: imageData });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleAiParse = async (params?: { type: 'url' | 'image'; data: string }) => {
-    const type = params?.type ?? 'url';
-    const data = params?.data ?? aiInputUrl.trim();
+  // 광고 다이얼로그를 먼저 띄우고, nonce 획득 후 실제 분석 진행
+  const startAiParse = (params: { type: 'url' | 'image'; data: string }) => {
+    setPendingAiParams(params);
+    setAdPromptOpen(true);
+  };
+
+  const handleAiParse = async (params: { type: 'url' | 'image'; data: string }, permissionNonce: string) => {
+    const { type, data } = params;
     if (!data) return;
 
     setIsParsing(true);
+    setAdPromptOpen(false);
     try {
       const res = await apiFetch('/api/analyze', {
         method: 'POST',
-        body: JSON.stringify({ type, data }),
+        body: JSON.stringify({ type, data, permissionNonce }),
       });
       const result = await res.json();
 
@@ -268,8 +275,6 @@ export default function HomeTab() {
           toast.error(result.message || 'AI 서비스가 잠시 혼잡해요. 잠시 후 다시 시도해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
         } else if (result.reason === 'low_confidence') {
           toast.info(result.message || '초대장 정보를 충분히 읽지 못했어요. 직접 입력을 이용해 주세요.', { duration: 4000, icon: <Info size={16} /> });
-        } else if (result.reason === 'no_credits') {
-          setAdPromptOpen(true);
         } else {
           toast.error('분석 실패. 직접 입력을 이용해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
         }
@@ -337,7 +342,6 @@ export default function HomeTab() {
       setAiInputUrl('');
     } finally {
       setIsParsing(false);
-      refreshCredits();
     }
   };
 
@@ -456,16 +460,25 @@ export default function HomeTab() {
 
         {/* 이름~관계 필드 묶음 */}
         <div className="space-y-2">
-          <Field
-            label="이름"
-            type="contact"
-            value={formData.targetName}
-            ai={!!initialFormData?.targetName}
-            tone={initialFormData?.targetName ? 'blue' : 'gray'}
-            onChange={(v: string, cid?: string) => updateFormData({ ...formData, targetName: v, contactId: cid })}
-            contacts={contacts}
-            suggestedNames={(formData as any).suggestedNames || []}
-          />
+          {/* [이름] [관계] 나란히 */}
+          <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
+            <Field
+              label="이름"
+              type="contact"
+              value={formData.targetName}
+              ai={!!initialFormData?.targetName}
+              tone={initialFormData?.targetName ? 'blue' : 'gray'}
+              onChange={(v: string, cid?: string) => updateFormData({ ...formData, targetName: v, contactId: cid })}
+              contacts={contacts}
+              suggestedNames={(formData as any).suggestedNames || []}
+            />
+            <Field
+              label="관계"
+              compact
+              value={formData.relation}
+              onChange={(v: string) => updateFormData({ ...formData, relation: v })}
+            />
+          </div>
 
           <ReviewDateField
             label="날짜"
@@ -492,6 +505,12 @@ export default function HomeTab() {
             />
           )}
 
+          <AmountReviewCard
+            amount={formData.amount}
+            reason={formData.recommendationReason}
+            onChange={(amount: number) => updateFormData({ ...formData, amount })}
+          />
+
           <Field
             label="장소"
             value={formData.location}
@@ -501,20 +520,6 @@ export default function HomeTab() {
             minFitFontSize={12}
             maxFitFontSize={14}
             onChange={(v: string) => updateFormData({ ...formData, location: v })}
-          />
-
-          <Field
-            label="관계"
-            value={formData.relation}
-            onChange={(v: string) => updateFormData({ ...formData, relation: v })}
-          />
-        </div>
-
-        <div>
-          <AmountReviewCard
-            amount={formData.amount}
-            reason={formData.recommendationReason}
-            onChange={(amount: number) => updateFormData({ ...formData, amount })}
           />
         </div>
 
@@ -664,7 +669,7 @@ export default function HomeTab() {
                 {/* 분석 버튼 */}
                 <button
                   type="button"
-                  onClick={() => handleAiParse()}
+                  onClick={() => startAiParse({ type: 'url', data: aiInputUrl.trim() })}
                   disabled={!canAnalyze}
                   className={`mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black transition-all active:scale-[0.98] ${
                     canAnalyze
@@ -736,8 +741,11 @@ export default function HomeTab() {
 
       <AdPromptDialog
         open={adPromptOpen}
-        onClose={() => setAdPromptOpen(false)}
+        onClose={() => { setAdPromptOpen(false); setPendingAiParams(null); }}
         rewardType="AI_CREDIT"
+        onGranted={(nonce) => {
+          if (pendingAiParams) handleAiParse(pendingAiParams, nonce);
+        }}
       />
 
       <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
@@ -973,7 +981,7 @@ function AccountReviewCard({ account, ai = false, suggestedAccounts = [], onChan
   );
 }
 
-function Field({ label, value, onChange, type = 'text', options = [], ai = false, contacts = [], placeholder = '', suggestedNames = [], tone, fitToWidth = false, minFitFontSize = 12, maxFitFontSize = 14 }: any) {
+function Field({ label, value, onChange, type = 'text', options = [], ai = false, contacts = [], placeholder = '', suggestedNames = [], tone, fitToWidth = false, minFitFontSize = 12, maxFitFontSize = 14, compact = false }: any) {
   const [show, setShow] = useState(false);
   const [localValue, setLocalValue] = useState(value ?? '');
   const [fitFontSize, setFitFontSize] = useState<number | null>(null);
@@ -1018,6 +1026,9 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
   const contactSuggestions = contacts.filter((c: any) => c.name.toLowerCase().includes((localValue || '').toLowerCase()));
   const isBlue = tone ? tone === 'blue' : ai;
   const fieldClass = isBlue ? 'border-blue-200 bg-blue-50/80' : 'border-gray-200 bg-gray-50';
+  const outerPadding = compact ? 'px-2.5 py-3' : 'px-3.5 py-3 max-[360px]:px-2.5';
+  const labelWidthClass = compact ? 'w-9 shrink-0' : 'w-9 shrink-0 max-[360px]:w-8';
+  const innerGap = compact ? 'gap-2.5' : 'gap-2.5 max-[360px]:gap-2';
   const inputClass = 'min-w-0 flex-1 bg-transparent text-[14px] font-black leading-snug text-gray-950 outline-none placeholder:text-gray-300 max-[360px]:text-[13px]';
   const shouldAutoFit = fitToWidth && type === 'text';
 
@@ -1053,9 +1064,9 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
 
   return (
     <div className="relative">
-      <div className={`rounded-2xl border px-3.5 py-3 max-[360px]:px-2.5 ${fieldClass}`}>
-        <div className={`flex min-h-6 gap-2.5 max-[360px]:gap-2 ${type === 'textarea' ? 'items-start' : 'items-center'}`}>
-          <label className={`w-9 shrink-0 text-[11px] font-black text-gray-500 max-[360px]:w-8 ${type === 'textarea' ? 'pt-0.5' : ''}`}>{label}</label>
+      <div className={`rounded-2xl border ${outerPadding} ${fieldClass}`}>
+        <div className={`flex min-h-6 ${innerGap} ${type === 'textarea' ? 'items-start' : 'items-center'}`}>
+          <label className={`${labelWidthClass} text-[11px] font-black text-gray-500 ${type === 'textarea' ? 'pt-0.5' : ''}`}>{label}</label>
           {type === 'select' ? (
             <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
               {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}

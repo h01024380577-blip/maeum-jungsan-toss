@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import {
-  consumeCredit,
-  refundCredit,
+  consumeAdPermission,
   resolveDbUserId,
-  isGuardEnabled,
 } from '@/src/lib/credits';
 import {
   buildExistingBulkDuplicateKeys,
@@ -62,6 +60,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const rawEntries = Array.isArray(body?.entries) ? body.entries : null;
   const creditToken = typeof body?.creditToken === 'string' ? body.creditToken : null;
+  const permissionNonce = typeof body?.permissionNonce === 'string' ? body.permissionNonce : '';
+
   if (!rawEntries || rawEntries.length === 0) {
     return withCors(req, NextResponse.json({ error: 'empty_entries' }, { status: 400 }));
   }
@@ -102,14 +102,19 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json({ error: 'no_valid_entries' }, { status: 400 }));
   }
 
-  // CSV 크레딧 가드 (env로 on/off)
-  const guardOn = isGuardEnabled('CSV_CREDIT');
-  const creditAlreadyConsumed = guardOn && verifyCsvCreditBypassToken(creditToken, userId);
-  if (guardOn && !creditAlreadyConsumed) {
-    const consumed = await consumeCredit(userId, 'CSV_CREDIT');
-    if (!consumed) {
+  // 광고 시청 확인: 입금 이미지 분석에서 발급된 bypass token이 있으면 nonce 불필요
+  const bypassVerified = verifyCsvCreditBypassToken(creditToken, userId);
+  if (!bypassVerified) {
+    if (!permissionNonce) {
       return withCors(req, NextResponse.json(
-        { success: false, reason: 'no_credits', rewardType: 'CSV_CREDIT' },
+        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
+        { status: 402 },
+      ));
+    }
+    const permitted = await consumeAdPermission(userId, 'CSV_CREDIT', permissionNonce);
+    if (!permitted) {
+      return withCors(req, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
         { status: 402 },
       ));
     }
@@ -178,7 +183,6 @@ export async function POST(req: NextRequest) {
         existingContacts.map((c) => [normalizeBulkName(c.name), c.id]),
       );
 
-      // 누락된 contact 생성
       for (const name of Array.from(new Set(entriesToInsert.map((e) => e.targetName)))) {
         const normalizedName = normalizeBulkName(name);
         if (!contactByName.has(normalizedName)) {
@@ -241,10 +245,6 @@ export async function POST(req: NextRequest) {
       return { inserted, skipped };
     });
 
-    if (guardOn && !creditAlreadyConsumed && result.inserted === 0) {
-      await refundCredit(userId, 'CSV_CREDIT');
-    }
-
     return withCors(
       req,
       NextResponse.json({
@@ -255,8 +255,6 @@ export async function POST(req: NextRequest) {
       }),
     );
   } catch (err) {
-    // 0건 저장 실패 → CSV 크레딧 환불
-    if (guardOn && !creditAlreadyConsumed) await refundCredit(userId, 'CSV_CREDIT');
     const message = err instanceof Error ? err.message : String(err);
     console.error('[bulk] insert failed:', message);
     return withCors(

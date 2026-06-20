@@ -5,7 +5,6 @@ import { corsResponse, withCors } from '@/src/lib/cors';
 import {
   CREDITS_CONFIG,
   isAllowedRewardAdGroupId,
-  resetAdWatchesIfNeeded,
   resolveDbUserId,
 } from '@/src/lib/credits';
 import type { RewardType } from '@prisma/client';
@@ -37,31 +36,7 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json({ error: 'invalid_ad_group_id' }, { status: 400 }));
   }
 
-  // KST 자정 기준 광고 시청 카운터 리셋
-  const { adWatchesToday } = await resetAdWatchesIfNeeded(userId);
-  if (adWatchesToday >= CREDITS_CONFIG.ad.dailyLimit) {
-    return withCors(
-      req,
-      NextResponse.json({ error: 'daily_ad_limit' }, { status: 429 }),
-    );
-  }
-
-  // rewardType별 잔고 상한 체크
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { aiCredits: true, csvImportCredits: true },
-  });
-  if (!user) {
-    return withCors(req, NextResponse.json({ error: 'user_not_found' }, { status: 404 }));
-  }
-
-  if (rewardType === 'AI_CREDIT' && user.aiCredits >= CREDITS_CONFIG.ai.cap) {
-    return withCors(req, NextResponse.json({ error: 'cap_reached_ai' }, { status: 409 }));
-  }
-  if (rewardType === 'CSV_CREDIT' && user.csvImportCredits >= CREDITS_CONFIG.csv.cap) {
-    return withCors(req, NextResponse.json({ error: 'cap_reached_csv' }, { status: 409 }));
-  }
-
+  // 동시 활성 nonce 개수 제한 (replay 방지)
   const now = new Date();
   const activeNonceCount = await prisma.adRewardGrant.count({
     where: {
@@ -74,10 +49,6 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json({ error: 'active_nonce_limit' }, { status: 429 }));
   }
 
-  const rewardAmount =
-    rewardType === 'AI_CREDIT'
-      ? CREDITS_CONFIG.ai.rewardAmount
-      : CREDITS_CONFIG.csv.rewardAmount;
   const nonce = generateNonce();
   const expiresAt = new Date(now.getTime() + CREDITS_CONFIG.ad.nonceTtlMs);
 
@@ -87,7 +58,7 @@ export async function POST(req: NextRequest) {
       adGroupId,
       rewardNonce: nonce,
       rewardType,
-      rewardAmount,
+      rewardAmount: 1,
       status: 'ISSUED',
       expiresAt,
       ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
@@ -100,7 +71,6 @@ export async function POST(req: NextRequest) {
     NextResponse.json({
       nonce,
       rewardType,
-      rewardAmount,
       expiresAt: expiresAt.toISOString(),
     }),
   );

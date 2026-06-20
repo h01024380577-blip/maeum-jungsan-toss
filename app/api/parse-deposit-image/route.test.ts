@@ -10,8 +10,7 @@ vi.mock('@google/genai', () => ({
 }));
 
 vi.mock('@/src/lib/credits', () => ({
-  isGuardEnabled: vi.fn(),
-  consumeCredit: vi.fn(),
+  consumeAdPermission: vi.fn(),
   resolveDbUserId: vi.fn(),
 }));
 
@@ -19,13 +18,18 @@ vi.mock('@/src/lib/importCreditToken', () => ({
   mintCsvCreditBypassToken: vi.fn(() => 'credit-token-1'),
 }));
 
-import { consumeCredit, isGuardEnabled, resolveDbUserId } from '@/src/lib/credits';
+vi.mock('@/src/lib/cors', () => ({
+  corsResponse: vi.fn().mockResolvedValue(new Response()),
+  withCors: (_req: unknown, res: Response) => res,
+}));
+
+import { consumeAdPermission, resolveDbUserId } from '@/src/lib/credits';
 import { POST } from './route';
 
-function makeRequest(image = 'data:image/jpeg;base64,abc123') {
+function makeRequest(image = 'data:image/jpeg;base64,abc123', permissionNonce = 'nonce-valid') {
   return new NextRequest('https://maeum-jungsan.test/api/parse-deposit-image', {
     method: 'POST',
-    body: JSON.stringify({ image }),
+    body: JSON.stringify({ image, permissionNonce }),
   });
 }
 
@@ -34,8 +38,7 @@ describe('/api/parse-deposit-image POST', () => {
     vi.clearAllMocks();
     process.env.GEMINI_API_KEY = 'test-key';
     vi.mocked(resolveDbUserId).mockResolvedValue('user-1');
-    vi.mocked(isGuardEnabled).mockReturnValue(true);
-    vi.mocked(consumeCredit).mockResolvedValue(true);
+    vi.mocked(consumeAdPermission).mockResolvedValue(true);
   });
 
   it('returns normalized deposit candidates from a screenshot', async () => {
@@ -75,23 +78,22 @@ describe('/api/parse-deposit-image POST', () => {
       source: 'gemini-image',
       creditToken: 'credit-token-1',
     });
-    expect(consumeCredit).toHaveBeenCalledWith('user-1', 'CSV_CREDIT');
+    expect(consumeAdPermission).toHaveBeenCalledWith('user-1', 'CSV_CREDIT', 'nonce-valid');
   });
 
+  it('returns 402 when no permissionNonce is provided', async () => {
+    const req = new NextRequest('https://maeum-jungsan.test/api/parse-deposit-image', {
+      method: 'POST',
+      body: JSON.stringify({ image: 'data:image/jpeg;base64,abc123' }),
+    });
 
-  it('does not consume CSV credit when AI analysis fails', async () => {
-    generateContent.mockRejectedValue(new Error('model failed'));
-
-    const response = await POST(makeRequest());
+    const response = await POST(req);
     const json = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(json).toMatchObject({
-      success: false,
-      reason: 'ai_failed',
-      message: 'AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.',
-    });
-    expect(consumeCredit).not.toHaveBeenCalled();
+    expect(response.status).toBe(402);
+    expect(json).toMatchObject({ reason: 'ad_required', rewardType: 'CSV_CREDIT' });
+    expect(consumeAdPermission).not.toHaveBeenCalled();
+    expect(generateContent).not.toHaveBeenCalled();
   });
 
   it('requires login before analyzing screenshots', async () => {
@@ -103,6 +105,6 @@ describe('/api/parse-deposit-image POST', () => {
     expect(response.status).toBe(401);
     expect(json).toMatchObject({ success: false, reason: 'unauthorized' });
     expect(generateContent).not.toHaveBeenCalled();
-    expect(consumeCredit).not.toHaveBeenCalled();
+    expect(consumeAdPermission).not.toHaveBeenCalled();
   });
 });

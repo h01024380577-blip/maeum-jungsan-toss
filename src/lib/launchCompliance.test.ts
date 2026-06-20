@@ -80,31 +80,30 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(script).toMatch(/cleanup_server_artifacts[\s\S]+sleep\s+0\.[0-9]+[\s\S]+cleanup_server_artifacts/);
   });
 
-  it('sets the new-user credit defaults to 1 and aligns AI cap migration with bulk imports', () => {
+  it('has removed the credit balance columns and added mandatory ad-watch model migration', () => {
     const schema = read('prisma/schema.prisma');
-    const migration = read('prisma/manual-migrations/2026-06-02_align_ai_credit_defaults.sql');
-    const deploy = read('scripts/deploy.sh');
+    const migration = read('prisma/manual-migrations/2026-06-20_remove_credits_add_consumed.sql');
 
-    expect(schema).toContain('aiCredits        Int      @default(1)');
-    expect(schema).toContain('csvImportCredits Int      @default(1)');
-    expect(schema).not.toContain('웰컴 5회');
-    expect(migration).toContain('ALTER COLUMN "aiCredits" SET DEFAULT 1');
-    expect(migration).toContain('UPDATE "User"');
-    expect(migration).toContain('SET "aiCredits" = 3');
-    expect(migration).toContain('WHERE "aiCredits" > 3');
-    expect(migration).toContain('AI_CREDIT_CAP=3');
-    expect(deploy).toContain('2026-06-02_align_ai_credit_defaults.sql');
+    // Credit balance columns removed from schema
+    expect(schema).not.toContain('aiCredits');
+    expect(schema).not.toContain('csvImportCredits');
+    expect(schema).not.toContain('adWatchesToday');
+    // CONSUMED status added for nonce-based permission tracking
+    expect(schema).toContain('CONSUMED');
+    // Migration removes old columns and adds CONSUMED
+    expect(migration).toContain('DROP COLUMN');
+    expect(migration).toContain('CONSUMED');
   });
 
-  it('shows and packages version 1.0.1', () => {
+  it('shows and packages version 1.0.2', () => {
     const pkg = JSON.parse(read('package.json'));
     const lock = JSON.parse(read('package-lock.json'));
     const settings = read('src/components/mypage/SettingsSheet.tsx');
 
-    expect(pkg.version).toBe('1.0.1');
-    expect(lock.version).toBe('1.0.1');
-    expect(lock.packages[''].version).toBe('1.0.1');
-    expect(settings).toContain('trailing="v1.0.1"');
+    expect(pkg.version).toBe('1.0.2');
+    expect(lock.version).toBe('1.0.2');
+    expect(lock.packages[''].version).toBe('1.0.2');
+    expect(settings).toContain('trailing="v1.0.2"');
   });
 
   it('uses the 3-credit storage cap in onboarding image copy', () => {

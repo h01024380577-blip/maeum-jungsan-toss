@@ -6,7 +6,6 @@ vi.mock('@/src/lib/apiClient', () => ({
   apiFetch: vi.fn(),
   clearAuthToken: vi.fn(),
   getAuthToken: vi.fn(),
-  registerCreditRefreshHook: vi.fn(),
 }));
 
 const mockedApiFetch = vi.mocked(apiFetch);
@@ -30,7 +29,6 @@ describe('useStore loadFromSupabase', () => {
     expect(state.isLoaded).toBe(true);
     expect(state.tossUserId).toBeNull();
     expect(state.entries).toEqual([]);
-    // /api/auth/me는 호출하지 않아야 함 (refreshCredits의 /api/credits만 허용)
     const calledPaths = mockedApiFetch.mock.calls.map(([url]) => String(url));
     expect(calledPaths.some((u) => u.includes('/api/auth/me'))).toBe(false);
   });
@@ -47,7 +45,7 @@ describe('useStore loadFromSupabase', () => {
 });
 
 describe('useStore clearData', () => {
-  it('clears auth-scoped data, credits, and analysis state', () => {
+  it('clears auth-scoped data and analysis state', () => {
     useStore.setState({
       entries: [{
         id: 'entry-1',
@@ -73,16 +71,6 @@ describe('useStore clearData', () => {
       tossUserId: 'user-1',
       tossUserName: '민수',
       notificationsEnabled: true,
-      credits: {
-        ai: { balance: 3, cap: 3, canWatchAd: true },
-        csv: { balance: 2, cap: 3, canWatchAd: true },
-        ad: {
-          watchesRemaining: 4,
-          dailyLimit: 10,
-          resetAt: '2026-05-16T00:00:00.000Z',
-        },
-        loaded: true,
-      },
       analysisResult: {
         data: { targetName: '김민수' },
         initialData: { targetName: '김민수' },
@@ -101,12 +89,6 @@ describe('useStore clearData', () => {
     expect(state.tossUserId).toBeNull();
     expect(state.tossUserName).toBeNull();
     expect(state.notificationsEnabled).toBe(false);
-    expect(state.credits).toEqual({
-      ai: { balance: 0, cap: 3, canWatchAd: false },
-      csv: { balance: 0, cap: 3, canWatchAd: false },
-      ad: { watchesRemaining: 0, dailyLimit: 10, resetAt: null },
-      loaded: false,
-    });
     expect(state.analysisResult).toEqual({
       data: null,
       initialData: null,
