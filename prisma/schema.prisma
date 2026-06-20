@@ -19,6 +19,7 @@ model User {
   scopes               String? // space-separated scope list
   notificationsEnabled Boolean   @default(false)
   sessionVersion       Int       @default(0)
+  premiumAdFree        Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -28,6 +29,7 @@ model User {
   transactions  Transaction[]
   rewardGrants  AdRewardGrant[]
   paymentOrders PaymentOrder[]
+  iapOrders     IapOrder[]
 }
 
 enum RewardType {
@@ -184,4 +186,23 @@ model Transaction {
 
   @@index([eventId])
   @@index([userId])
+}
+
+model IapOrder {
+  id         String         @id @default(cuid())
+  userId     String
+  orderId    String         @unique
+  sku        String
+  status     IapOrderStatus @default(PURCHASED)
+  grantedAt  DateTime       @default(now())
+  refundedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum IapOrderStatus {
+  PURCHASED
+  REFUNDED
 }
