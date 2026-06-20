@@ -4,8 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { corsResponse, withCors } from '@/src/lib/cors';
 import { isRateLimitError, parseAiResponse, RATE_LIMIT_RESPONSE } from '@/src/lib/geminiHelpers';
 import { normalizeDepositImageBatch } from '@/src/lib/parseDepositImage';
-import { consumeAdPermission } from '@/src/lib/credits';
-import { resolveDbUserId } from '@/src/lib/credits';
+import { consumeAdPermission, resolveDbUserId, isPremiumUser } from '@/src/lib/credits';
 import { mintCsvCreditBypassToken } from '@/src/lib/importCreditToken';
 
 export async function OPTIONS(req: NextRequest) {
@@ -58,19 +57,20 @@ export async function POST(req: NextRequest) {
       ));
     }
 
-    if (!permissionNonce) {
-      return withCors(req, NextResponse.json(
-        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
-        { status: 402 },
-      ));
-    }
-
-    const permitted = await consumeAdPermission(userId, 'CSV_CREDIT', permissionNonce);
-    if (!permitted) {
-      return withCors(req, NextResponse.json(
-        { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
-        { status: 402 },
-      ));
+    if (!(await isPremiumUser(userId))) {
+      if (!permissionNonce) {
+        return withCors(req, NextResponse.json(
+          { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
+          { status: 402 },
+        ));
+      }
+      const permitted = await consumeAdPermission(userId, 'CSV_CREDIT', permissionNonce);
+      if (!permitted) {
+        return withCors(req, NextResponse.json(
+          { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },
+          { status: 402 },
+        ));
+      }
     }
 
     const apiKey = process.env.GEMINI_API_KEY;

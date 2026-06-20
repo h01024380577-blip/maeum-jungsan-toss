@@ -5,6 +5,7 @@ import {
   consumeAdPermission,
   restoreAdPermission,
   resolveDbUserId,
+  isPremiumUser,
 } from '@/src/lib/credits';
 import {
   isTransientGeminiError,
@@ -72,21 +73,23 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json(body, { status: res.status }));
   }
 
-  // 텍스트/이미지 분석: nonce 필수
-  const nonce = typeof permissionNonce === 'string' ? permissionNonce : '';
-  if (!nonce) {
-    return withCors(req, NextResponse.json(
-      { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
-      { status: 402 },
-    ));
-  }
-
-  const permitted = await consumeAdPermission(userId, 'AI_CREDIT', nonce);
-  if (!permitted) {
-    return withCors(req, NextResponse.json(
-      { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
-      { status: 402 },
-    ));
+  // 텍스트/이미지 분석: 프리미엄이면 광고 게이트 우회, 아니면 nonce 필수
+  let nonce = '';
+  if (!(await isPremiumUser(userId))) {
+    nonce = typeof permissionNonce === 'string' ? permissionNonce : '';
+    if (!nonce) {
+      return withCors(req, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+        { status: 402 },
+      ));
+    }
+    const permitted = await consumeAdPermission(userId, 'AI_CREDIT', nonce);
+    if (!permitted) {
+      return withCors(req, NextResponse.json(
+        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+        { status: 402 },
+      ));
+    }
   }
 
   try {
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     const transient = isTransientGeminiError(e);
     if (transient) {
-      await restoreAdPermission(userId, 'AI_CREDIT', nonce);
+      if (nonce) { await restoreAdPermission(userId, 'AI_CREDIT', nonce); }
       return withCors(req, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
     }
     console.error('[analyze] error:', e?.message || e);

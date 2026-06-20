@@ -17,6 +17,7 @@ import {
   consumeAdPermission,
   restoreAdPermission,
   resolveDbUserId,
+  isPremiumUser,
 } from '@/src/lib/credits';
 
 export async function OPTIONS(req: NextRequest) {
@@ -137,18 +138,20 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       ));
     }
-    if (!permissionNonce) {
-      return withCors(request, NextResponse.json(
-        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
-        { status: 402 },
-      ));
-    }
-    const permitted = await consumeAdPermission(userId, 'AI_CREDIT', permissionNonce);
-    if (!permitted) {
-      return withCors(request, NextResponse.json(
-        { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
-        { status: 402 },
-      ));
+    if (!(await isPremiumUser(userId))) {
+      if (!permissionNonce) {
+        return withCors(request, NextResponse.json(
+          { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+          { status: 402 },
+        ));
+      }
+      const permitted = await consumeAdPermission(userId, 'AI_CREDIT', permissionNonce);
+      if (!permitted) {
+        return withCors(request, NextResponse.json(
+          { success: false, reason: 'ad_required', rewardType: 'AI_CREDIT' },
+          { status: 402 },
+        ));
+      }
     }
 
     const ai = new GoogleGenAI({ apiKey });

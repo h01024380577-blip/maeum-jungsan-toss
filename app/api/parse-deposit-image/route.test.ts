@@ -12,6 +12,7 @@ vi.mock('@google/genai', () => ({
 vi.mock('@/src/lib/credits', () => ({
   consumeAdPermission: vi.fn(),
   resolveDbUserId: vi.fn(),
+  isPremiumUser: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/src/lib/importCreditToken', () => ({

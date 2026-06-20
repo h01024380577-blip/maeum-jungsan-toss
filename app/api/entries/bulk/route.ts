@@ -4,6 +4,7 @@ import { corsResponse, withCors } from '@/src/lib/cors';
 import {
   consumeAdPermission,
   resolveDbUserId,
+  isPremiumUser,
 } from '@/src/lib/credits';
 import {
   buildExistingBulkDuplicateKeys,
@@ -102,9 +103,10 @@ export async function POST(req: NextRequest) {
     return withCors(req, NextResponse.json({ error: 'no_valid_entries' }, { status: 400 }));
   }
 
-  // 광고 시청 확인: 입금 이미지 분석에서 발급된 bypass token이 있으면 nonce 불필요
+  // 광고 시청 확인: 프리미엄/입금이미지 bypass 토큰이 있으면 nonce 불필요
   const bypassVerified = verifyCsvCreditBypassToken(creditToken, userId);
-  if (!bypassVerified) {
+  const premium = await isPremiumUser(userId);
+  if (!bypassVerified && !premium) {
     if (!permissionNonce) {
       return withCors(req, NextResponse.json(
         { success: false, reason: 'ad_required', rewardType: 'CSV_CREDIT' },

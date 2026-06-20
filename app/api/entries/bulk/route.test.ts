@@ -10,6 +10,7 @@ vi.mock('@/src/lib/prisma', () => ({
 vi.mock('@/src/lib/credits', () => ({
   resolveDbUserId: vi.fn(),
   consumeAdPermission: vi.fn(),
+  isPremiumUser: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/src/lib/importCreditToken', () => ({
