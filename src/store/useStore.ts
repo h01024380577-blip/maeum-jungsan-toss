@@ -41,6 +41,7 @@ interface AppState {
   contacts: Contact[];
   feedback: any[];
   isLoaded: boolean;
+  isPremium: boolean;
   tossUserId: string | null;
   tossUserName: string | null;
   notificationsEnabled: boolean;
@@ -52,6 +53,7 @@ interface AppState {
     selectedImage: string | null;
   };
   loadFromSupabase: () => Promise<void>;
+  loadPremiumStatus: () => Promise<void>;
   addEntry: (entry: Omit<EventEntry, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   removeEntry: (id: string) => Promise<void>;
   updateEntry: (id: string, entry: Partial<EventEntry>) => Promise<void>;
@@ -81,6 +83,7 @@ export const useStore = create<AppState>()((set, get) => ({
   contacts: [],
   feedback: [],
   isLoaded: false,
+  isPremium: false,
   tossUserId: null,
   tossUserName: null,
   notificationsEnabled: false,
@@ -112,6 +115,8 @@ export const useStore = create<AppState>()((set, get) => ({
         tossUserName: me.name ?? null,
         notificationsEnabled: me.notificationsEnabled ?? false,
       });
+      void get().loadPremiumStatus();
+      void import('@/src/lib/iap').then((m) => m.restorePremium()).then(() => get().loadPremiumStatus());
       const [entriesRes, contactsRes] = await Promise.all([
         apiFetch('/api/entries').then(r => r.ok ? r.json() : { entries: [] }),
         apiFetch('/api/contacts').then(r => r.ok ? r.json() : { contacts: [] }),
@@ -123,6 +128,16 @@ export const useStore = create<AppState>()((set, get) => ({
       });
     } catch {
       set({ isLoaded: true });
+    }
+  },
+
+  loadPremiumStatus: async () => {
+    try {
+      const res = await apiFetch('/api/iap/status');
+      const json = res.ok ? await res.json() : { premium: false };
+      set({ isPremium: json?.premium === true });
+    } catch {
+      set({ isPremium: false });
     }
   },
 
