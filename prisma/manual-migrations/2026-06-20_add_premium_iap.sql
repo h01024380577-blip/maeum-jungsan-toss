@@ -21,3 +21,4 @@ CREATE TABLE IF NOT EXISTS "IapOrder" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "IapOrder_orderId_key" ON "IapOrder"("orderId");
 CREATE INDEX IF NOT EXISTS "IapOrder_userId_idx" ON "IapOrder"("userId");
+CREATE INDEX IF NOT EXISTS "IapOrder_userId_status_idx" ON "IapOrder"("userId", "status");

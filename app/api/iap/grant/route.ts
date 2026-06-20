@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   await prisma.$transaction([
     prisma.iapOrder.upsert({
       where: { orderId },
-      update: {},
+      update: { status: 'PURCHASED', refundedAt: null },
       create: { userId: session.userId, orderId, sku: order.sku, status: 'PURCHASED' },
     }),
     prisma.user.update({

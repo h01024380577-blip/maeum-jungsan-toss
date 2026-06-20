@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       } catch (e: any) {
         console.error('[parse-url] Phase 1a error:', e?.message);
         if (isTransientGeminiError(e)) {
-          await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
+          if (permissionNonce) { await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce); }
           return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
         }
       }
@@ -234,7 +234,7 @@ ${OUTPUT_SCHEMA}`;
     } catch (e: any) {
       console.error('[parse-url] Phase 2 (Jina) error:', e?.message);
       if (isTransientGeminiError(e)) {
-        await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
+        if (permissionNonce) { await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce); }
         return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
       }
     }
@@ -265,7 +265,7 @@ ${OUTPUT_SCHEMA}`;
     } catch (e: any) {
       console.error('[parse-url] Phase 3 error:', e?.message);
       if (isTransientGeminiError(e)) {
-        await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce);
+        if (permissionNonce) { await restoreAdPermission(userId, 'AI_CREDIT', permissionNonce); }
         return withCors(request, NextResponse.json(TRANSIENT_RESPONSE, { status: 503 }));
       }
       return withCors(request, NextResponse.json(
