@@ -2,12 +2,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Crown } from 'lucide-react';
 import { useStore } from '@/src/store/useStore';
 
 import ProfileCard from '@/src/components/mypage/ProfileCard';
 import StatsOverview from '@/src/components/mypage/StatsOverview';
 import SettingsSheet from '@/src/components/mypage/SettingsSheet';
+import PremiumSheet from '@/src/components/mypage/PremiumSheet';
 import InlineBanner from '@/src/components/ads/InlineBanner';
 
 const STATS_BANNER_AD_GROUP_ID =
@@ -18,6 +19,8 @@ export default function MyPageTab() {
   const isLoaded = useStore((s) => s.isLoaded);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
+  const isPremium = useStore((s) => s.isPremium);
 
   // MY 탭은 게스트 접근 허용 (통계/설정 열람)
   if (!isLoaded) return null;
@@ -34,14 +37,24 @@ export default function MyPageTab() {
               : '비로그인 · 활동은 로그인 후 저장돼요'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="설정 열기"
-          className="p-2 -mr-1 text-gray-400 hover:text-gray-600 active:scale-90 transition-all"
-        >
-          <Settings size={22} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setPremiumOpen(true)}
+            aria-label="프리미엄"
+            className={`p-2 active:scale-90 transition-all ${isPremium ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'}`}
+          >
+            <Crown size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="설정 열기"
+            className="p-2 -mr-1 text-gray-400 hover:text-gray-600 active:scale-90 transition-all"
+          >
+            <Settings size={22} />
+          </button>
+        </div>
       </div>
 
       <div className="px-5 pt-4 space-y-6">
@@ -69,6 +82,7 @@ export default function MyPageTab() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+      <PremiumSheet open={premiumOpen} onClose={() => setPremiumOpen(false)} />
     </div>
   );
 }
