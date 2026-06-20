@@ -157,7 +157,7 @@ const defaultFormData = (): Partial<EventEntry> => ({
 
 export default function HomeTab() {
   const router = useRouter();
-  const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName } = useStore();
+  const { entries, addEntry, addFeedback, contacts, tossUserId, tossUserName, isPremium } = useStore();
 
   // AI 분석 시트
   const [showAiSheet, setShowAiSheet] = useState(false);
@@ -250,7 +250,12 @@ export default function HomeTab() {
   };
 
   // 광고 다이얼로그를 먼저 띄우고, nonce 획득 후 실제 분석 진행
+  // 프리미엄 사용자는 광고 프롬프트를 건너뛰고 빈 nonce로 바로 실행
   const startAiParse = (params: { type: 'url' | 'image'; data: string }) => {
+    if (isPremium) {
+      handleAiParse(params, '');
+      return;
+    }
     setPendingAiParams(params);
     setAdPromptOpen(true);
   };

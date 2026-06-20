@@ -120,7 +120,7 @@ interface Props {
 }
 
 export default function BulkImportModal({ isOpen, onClose }: Props) {
-  const { bulkAddEntries } = useStore();
+  const { bulkAddEntries, isPremium } = useStore();
   const [step, setStep] = useState<'upload' | 'fileOptions' | 'mapping' | 'preview' | 'depositReview'>('upload');
   const [csvData, setCsvData] = useState<RawCSVData | null>(null);
   const [transactionType, setTransactionType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
@@ -246,6 +246,10 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   };
 
   const startDepositAnalysis = (imageData: string) => {
+    if (isPremium) {
+      analyzeDepositImage(imageData, '');
+      return;
+    }
     setPendingImageData(imageData);
     setPendingAdAction('image');
     setAdPromptOpen(true);
@@ -476,10 +480,15 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   };
 
   // 일반/백업 CSV 가져오기 — 광고 시청 후 nonce로 실행
+  // 프리미엄 사용자는 광고 프롬프트를 건너뛰고 빈 nonce로 바로 실행
   const startImport = () => {
     const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
     if (processed.length === 0) {
       setError('가져올 유효한 데이터가 없습니다.');
+      return;
+    }
+    if (isPremium) {
+      handleImport('');
       return;
     }
     setPendingAdAction('import');
