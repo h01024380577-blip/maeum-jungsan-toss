@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
-import AdPromptDialog from '@/src/components/ads/AdPromptDialog';
+import { useRewardedAd } from '@/src/hooks/useRewardedAd';
 import { Sparkles, ArrowUpRight, ArrowDownLeft, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -164,8 +164,7 @@ export default function HomeTab() {
   const [aiInputUrl, setAiInputUrl] = useState('');
   const [aiSelectedImage, setAiSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
-  const [adPromptOpen, setAdPromptOpen] = useState(false);
-  const [pendingAiParams, setPendingAiParams] = useState<{ type: 'url' | 'image'; data: string } | null>(null);
+  const { watch: watchAiAd } = useRewardedAd('AI_CREDIT');
 
   // 메인 폼 상태
   const [formData, setFormData] = useState<Partial<EventEntry>>(defaultFormData());
@@ -181,8 +180,7 @@ export default function HomeTab() {
     setFormData(next);
   }, []);
 
-  useBackHandler(showAiSheet || showTransferModal || adPromptOpen, () => {
-    if (adPromptOpen) { setAdPromptOpen(false); return true; }
+  useBackHandler(showAiSheet || showTransferModal, () => {
     if (showTransferModal) { setShowTransferModal(false); return true; }
     if (showAiSheet) { setShowAiSheet(false); return true; }
     return false;
@@ -249,15 +247,15 @@ export default function HomeTab() {
     }
   };
 
-  // 광고 다이얼로그를 먼저 띄우고, nonce 획득 후 실제 분석 진행
-  // 프리미엄 사용자는 광고 프롬프트를 건너뛰고 빈 nonce로 바로 실행
-  const startAiParse = (params: { type: 'url' | 'image'; data: string }) => {
+  // 확인 다이얼로그 없이 바로 리워드 광고를 재생 → nonce 획득 시 실제 분석 진행
+  // 프리미엄 사용자는 광고를 건너뛰고 빈 nonce로 바로 실행
+  const startAiParse = async (params: { type: 'url' | 'image'; data: string }) => {
     if (isPremium) {
       handleAiParse(params, '');
       return;
     }
-    setPendingAiParams(params);
-    setAdPromptOpen(true);
+    const nonce = await watchAiAd();
+    if (nonce) handleAiParse(params, nonce);
   };
 
   const handleAiParse = async (params: { type: 'url' | 'image'; data: string }, permissionNonce: string) => {
@@ -265,7 +263,6 @@ export default function HomeTab() {
     if (!data) return;
 
     setIsParsing(true);
-    setAdPromptOpen(false);
     try {
       const res = await apiFetch('/api/analyze', {
         method: 'POST',
@@ -743,15 +740,6 @@ export default function HomeTab() {
           </>
         )}
       </AnimatePresence>
-
-      <AdPromptDialog
-        open={adPromptOpen}
-        onClose={() => { setAdPromptOpen(false); setPendingAiParams(null); }}
-        rewardType="AI_CREDIT"
-        onGranted={(nonce) => {
-          if (pendingAiParams) handleAiParse(pendingAiParams, nonce);
-        }}
-      />
 
       <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
     </div>

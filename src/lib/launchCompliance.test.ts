@@ -95,15 +95,15 @@ describe('Apps-in-Toss launch compliance', () => {
     expect(migration).toContain('CONSUMED');
   });
 
-  it('shows and packages version 1.0.2', () => {
+  it('shows and packages version 1.1.0', () => {
     const pkg = JSON.parse(read('package.json'));
     const lock = JSON.parse(read('package-lock.json'));
     const settings = read('src/components/mypage/SettingsSheet.tsx');
 
-    expect(pkg.version).toBe('1.0.2');
-    expect(lock.version).toBe('1.0.2');
-    expect(lock.packages[''].version).toBe('1.0.2');
-    expect(settings).toContain('trailing="v1.0.2"');
+    expect(pkg.version).toBe('1.1.0');
+    expect(lock.version).toBe('1.1.0');
+    expect(lock.packages[''].version).toBe('1.1.0');
+    expect(settings).toContain('trailing="v1.1.0"');
   });
 
   it('uses the 3-credit storage cap in onboarding image copy', () => {

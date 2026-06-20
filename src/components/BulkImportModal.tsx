@@ -5,7 +5,7 @@ import { X, Upload, Check, AlertCircle, Table as TableIcon, Sparkles, Database, 
 import { parseCSVFile, cleanAmount, cleanDate, normalizeEventType, RawCSVData } from '../utils/csvParser';
 import { useStore, type EventType } from '../store/useStore';
 import { apiFetch } from '../lib/apiClient';
-import AdPromptDialog from './ads/AdPromptDialog';
+import { useRewardedAd } from '@/src/hooks/useRewardedAd';
 import { toast } from 'sonner';
 import { formatAmountMan, formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { useBackHandler } from '../hooks/useBackHandler';
@@ -134,10 +134,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   });
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [adPromptOpen, setAdPromptOpen] = useState(false);
-  // 광고 다이얼로그가 열렸을 때 대기 중인 액션 타입
-  const [pendingAdAction, setPendingAdAction] = useState<'image' | 'import' | null>(null);
-  const [pendingImageData, setPendingImageData] = useState<string | null>(null);
+  const { watch: watchCsvAd } = useRewardedAd('CSV_CREDIT');
   const [aiState, setAiState] = useState<'idle' | 'mapping' | 'success' | 'failed'>('idle');
   const [aiReason, setAiReason] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'general' | 'backup' | 'deposit'>('general');
@@ -245,14 +242,13 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
-  const startDepositAnalysis = (imageData: string) => {
+  const startDepositAnalysis = async (imageData: string) => {
     if (isPremium) {
       analyzeDepositImage(imageData, '');
       return;
     }
-    setPendingImageData(imageData);
-    setPendingAdAction('image');
-    setAdPromptOpen(true);
+    const nonce = await watchCsvAd();
+    if (nonce) analyzeDepositImage(imageData, nonce);
   };
 
   const handleDepositFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -481,7 +477,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
 
   // 일반/백업 CSV 가져오기 — 광고 시청 후 nonce로 실행
   // 프리미엄 사용자는 광고 프롬프트를 건너뛰고 빈 nonce로 바로 실행
-  const startImport = () => {
+  const startImport = async () => {
     const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
     if (processed.length === 0) {
       setError('가져올 유효한 데이터가 없습니다.');
@@ -491,8 +487,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       handleImport('');
       return;
     }
-    setPendingAdAction('import');
-    setAdPromptOpen(true);
+    const nonce = await watchCsvAd();
+    if (nonce) handleImport(nonce);
   };
 
   const handleImport = async (permissionNonce: string) => {
@@ -549,8 +545,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     setDepositRows([]);
     setDepositCreditToken(null);
     setIsAnalyzingDeposit(false);
-    setPendingAdAction(null);
-    setPendingImageData(null);
   };
 
   const handleClose = () => {
@@ -579,11 +573,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   };
 
   useBackHandler(isOpen, () => {
-    if (adPromptOpen) {
-      setAdPromptOpen(false);
-      return true;
-    }
-
     if (isImporting || isAnalyzingDeposit) return true;
 
     if (step !== 'upload') {
@@ -1141,21 +1130,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
               </div>
             )}
           </motion.div>
-          <AdPromptDialog
-            open={adPromptOpen}
-            onClose={() => { setAdPromptOpen(false); setPendingAdAction(null); setPendingImageData(null); }}
-            rewardType="CSV_CREDIT"
-            onGranted={(nonce) => {
-              setAdPromptOpen(false);
-              if (pendingAdAction === 'image' && pendingImageData) {
-                analyzeDepositImage(pendingImageData, nonce);
-              } else if (pendingAdAction === 'import') {
-                handleImport(nonce);
-              }
-              setPendingAdAction(null);
-              setPendingImageData(null);
-            }}
-          />
         </>
       )}
     </AnimatePresence>
