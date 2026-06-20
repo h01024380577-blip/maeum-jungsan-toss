@@ -156,3 +156,12 @@ export async function resolveDbUserId(req: NextRequest): Promise<string | null> 
   if (deviceId) return ensureUserRecord(deviceId, true);
   return null;
 }
+
+/** 사용자가 평생 광고 제거 프리미엄을 보유했는지 여부. */
+export async function isPremiumUser(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { premiumAdFree: true },
+  });
+  return user?.premiumAdFree === true;
+}
