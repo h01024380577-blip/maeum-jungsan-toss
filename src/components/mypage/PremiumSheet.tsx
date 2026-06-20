@@ -54,14 +54,14 @@ export default function PremiumSheet({ open, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white p-6 pb-8"
+        className="w-full max-w-[430px] rounded-t-3xl bg-white p-6 pb-[calc(2rem+env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Crown size={22} className="text-amber-500" />
+            <Crown size={22} className="text-[#0488DA]" />
             <h2 className="text-lg font-black text-gray-900">평생 광고 제거 프리미엄</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="닫기" className="p-1 text-gray-400">
