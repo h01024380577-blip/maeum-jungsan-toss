@@ -38,19 +38,17 @@ export default function MyPageTab() {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setPremiumOpen(true)}
-            aria-label={isPremium ? '프리미엄 이용 중' : '프리미엄 구독하기'}
-            className={`flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-bold active:scale-95 transition-all ${
-              isPremium
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-gradient-to-br from-[#0488DA] to-[#56DDCC] text-white hover:brightness-105'
-            }`}
-          >
-            <Crown size={14} className={isPremium ? 'fill-amber-400' : 'fill-white/30'} />
-            {isPremium ? '프리미엄 이용 중' : '프리미엄 구독하기'}
-          </button>
+          {!isPremium && (
+            <button
+              type="button"
+              onClick={() => setPremiumOpen(true)}
+              aria-label="프리미엄 구독하기"
+              className="flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-bold active:scale-95 transition-all bg-gradient-to-br from-[#0488DA] to-[#56DDCC] text-white hover:brightness-105"
+            >
+              <Crown size={14} className="fill-white/30" />
+              프리미엄 구독하기
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
