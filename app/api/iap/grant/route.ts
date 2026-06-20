@@ -31,21 +31,35 @@ export async function POST(req: NextRequest) {
   }
 
   const order = await getOrderStatus(user.tossUserKey, orderId);
-  if (!order) {
-    return withCors(req, NextResponse.json({ granted: false, reason: 'verify_failed' }, { status: 502 }));
-  }
-  if (order.sku !== PREMIUM_SKU) {
-    return withCors(req, NextResponse.json({ granted: false, reason: 'sku_mismatch' }, { status: 400 }));
-  }
-  if (order.status !== 'PURCHASED' && order.status !== 'PAYMENT_COMPLETED') {
-    return withCors(req, NextResponse.json({ granted: false, reason: order.status }, { status: 200 }));
+  const verified =
+    !!order &&
+    order.sku === PREMIUM_SKU &&
+    (order.status === 'PURCHASED' || order.status === 'PAYMENT_COMPLETED');
+
+  // 앱인토스 샌드박스 주문은 운영 주문상태 API에서 NOT_FOUND로 조회되지 않는다.
+  // IAP_ALLOW_UNVERIFIED_GRANT=true (샌드박스 테스트 전용)이면 검증 실패에도 지급한다.
+  // ⚠️ 운영 환경에는 절대 설정하지 말 것 — 미검증 지급(자가지급) 허용됨.
+  if (!verified) {
+    if (process.env.IAP_ALLOW_UNVERIFIED_GRANT !== 'true') {
+      if (!order) {
+        return withCors(req, NextResponse.json({ granted: false, reason: 'verify_failed' }, { status: 502 }));
+      }
+      if (order.sku !== PREMIUM_SKU) {
+        return withCors(req, NextResponse.json({ granted: false, reason: 'sku_mismatch' }, { status: 400 }));
+      }
+      return withCors(req, NextResponse.json({ granted: false, reason: order.status }, { status: 200 }));
+    }
+    console.warn(
+      `[iap][UNVERIFIED_GRANT] orderId=${orderId} status=${order?.status ?? 'no-order'} sku=${order?.sku ?? 'null'} — IAP_ALLOW_UNVERIFIED_GRANT 활성화로 지급`,
+    );
   }
 
+  const grantSku = order?.sku === PREMIUM_SKU ? order.sku : PREMIUM_SKU;
   await prisma.$transaction([
     prisma.iapOrder.upsert({
       where: { orderId },
       update: { status: 'PURCHASED', refundedAt: null },
-      create: { userId: session.userId, orderId, sku: order.sku, status: 'PURCHASED' },
+      create: { userId: session.userId, orderId, sku: grantSku, status: 'PURCHASED' },
     }),
     prisma.user.update({
       where: { id: session.userId },

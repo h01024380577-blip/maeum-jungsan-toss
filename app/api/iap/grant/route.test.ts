@@ -62,4 +62,25 @@ describe('POST /api/iap/grant', () => {
     expect((await res.json()).granted).toBe(false);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
+
+  it('still denies NOT_FOUND/sku-null when flag is off (production strict)', async () => {
+    vi.mocked(getOrderStatus).mockResolvedValue({ orderId: 'o1', sku: null, status: 'NOT_FOUND', statusDeterminedAt: null, reason: 'not found' } as never);
+    const res = await POST(reqWith({ orderId: 'o1' }));
+    expect((await res.json()).granted).toBe(false);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('grants on NOT_FOUND when IAP_ALLOW_UNVERIFIED_GRANT=true (sandbox bypass)', async () => {
+    const prev = process.env.IAP_ALLOW_UNVERIFIED_GRANT;
+    process.env.IAP_ALLOW_UNVERIFIED_GRANT = 'true';
+    try {
+      vi.mocked(getOrderStatus).mockResolvedValue({ orderId: 'o1', sku: null, status: 'NOT_FOUND', statusDeterminedAt: null, reason: 'not found' } as never);
+      const res = await POST(reqWith({ orderId: 'o1' }));
+      expect((await res.json()).granted).toBe(true);
+      expect(prisma.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { premiumAdFree: true } });
+    } finally {
+      if (prev === undefined) delete process.env.IAP_ALLOW_UNVERIFIED_GRANT;
+      else process.env.IAP_ALLOW_UNVERIFIED_GRANT = prev;
+    }
+  });
 });
