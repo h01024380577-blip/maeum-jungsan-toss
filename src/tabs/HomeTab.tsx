@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
+import { trackClick } from '@/src/lib/analytics';
 import { useRewardedAd } from '@/src/hooks/useRewardedAd';
 import { Sparkles, ArrowUpRight, ArrowDownLeft, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
@@ -250,6 +251,7 @@ export default function HomeTab() {
   // 확인 다이얼로그 없이 바로 리워드 광고를 재생 → nonce 획득 시 실제 분석 진행
   // 프리미엄 사용자는 광고를 건너뛰고 빈 nonce로 바로 실행
   const startAiParse = async (params: { type: 'url' | 'image'; data: string }) => {
+    trackClick('analyze_start', { input_type: params.type, is_premium: isPremium });
     if (isPremium) {
       handleAiParse(params, '');
       return;
@@ -337,6 +339,11 @@ export default function HomeTab() {
       setShowAiSheet(false);
       setAiInputUrl('');
       setAiSelectedImage(null);
+      trackClick('analyze_success', {
+        input_type: type,
+        confidence: parsed.confidence ?? result.confidence ?? null,
+        event_type: parsed.eventType ?? null,
+      });
       toast.success('AI 분석 완료! 내용을 확인해주세요.', { duration: 2000, icon: <Sparkles size={16} /> });
     } catch (err: any) {
       toast.error(`분석 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
@@ -370,6 +377,10 @@ export default function HomeTab() {
         account: formData.account || '',
         recommendationReason: formData.recommendationReason || '',
         customEventName: formData.customEventName || '',
+      });
+      trackClick('entry_save', {
+        entry_type: formData.isIncome ? 'INCOME' : 'EXPENSE',
+        event_type: formData.eventType ?? 'other',
       });
       if (isAppsInToss()) {
         const { generateHapticFeedback } = await import('@apps-in-toss/web-framework');

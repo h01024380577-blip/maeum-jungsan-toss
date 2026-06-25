@@ -15,7 +15,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^2.4.1",
+    "@apps-in-toss/web-framework": "^2.9.3",
     "@emotion/react": "^11.14.0",
     "@google/genai": "^1.29.0",
     "@prisma/client": "^6.19.2",

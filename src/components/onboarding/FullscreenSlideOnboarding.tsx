@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useStore } from '@/src/store/useStore';
 import { apiFetch, setAuthToken } from '@/src/lib/apiClient';
 import { tossLogin } from '@/src/lib/tossAuth';
+import { trackClick } from '@/src/lib/analytics';
 
 interface Slide {
   image: string;
@@ -87,6 +88,7 @@ export default function FullscreenSlideOnboarding({ onComplete }: FullscreenSlid
       const data = await res.json();
       if (data.token) setAuthToken(data.token);
       localStorage.setItem('heartbook-onboarding-seen', 'true');
+      trackClick('toss_login', { context: 'onboarding' });
       await loadFromSupabase();
       onComplete();
     } catch (e) {

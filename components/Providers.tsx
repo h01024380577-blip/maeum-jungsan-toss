@@ -7,8 +7,20 @@ import { ThemeProvider as TdsThemeProvider } from "@toss/tds-mobile";
 import { useStore } from "@/src/store/useStore";
 import FullscreenSlideOnboarding from "@/src/components/onboarding/FullscreenSlideOnboarding";
 import { ThemeProvider, useTheme } from "@/src/lib/theme";
+import { trackScreen } from "@/src/lib/analytics";
 
 const SKIP_ONBOARDING_PATHS = ['/terms', '/intro'];
+
+// 경로 → 앱인토스 콘솔에 표시될 화면 이름
+const SCREEN_NAMES: Record<string, string> = {
+  '/': 'home',
+  '/calendar': 'calendar',
+  '/history': 'history',
+  '/contacts': 'contacts',
+  '/stats': 'my',
+  '/intro': 'intro',
+  '/terms': 'terms',
+};
 
 function InnerProviders({ children }: { children: React.ReactNode }) {
   const { loadFromSupabase, isLoaded, tossUserId } = useStore();
@@ -22,6 +34,11 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadFromSupabase();
   }, [loadFromSupabase]);
+
+  // 사용자분석: 화면 진입 로그 (라이브 환경에서만 실제 수집됨)
+  useEffect(() => {
+    trackScreen(SCREEN_NAMES[pathname] ?? pathname.replace(/^\//, '') ?? 'home');
+  }, [pathname]);
 
   // 비로그인 상태면 모든 온보딩 상태 초기화 (탈퇴·로그아웃 후 재표시)
   useEffect(() => {

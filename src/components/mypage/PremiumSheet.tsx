@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Crown, X } from 'lucide-react';
 import { useStore } from '@/src/store/useStore';
 import { getPremiumProduct, purchasePremium, isIapSupported } from '@/src/lib/iap';
+import { trackClick } from '@/src/lib/analytics';
 import { toast } from 'sonner';
 
 interface Props {
@@ -38,11 +39,13 @@ export default function PremiumSheet({ open, onClose }: Props) {
       toast.info('토스 로그인 후 구매할 수 있어요.');
       return;
     }
+    trackClick('premium_buy_click');
     setBuying(true);
     await purchasePremium({
       onSuccess: async () => {
         await loadPremiumStatus();
         setBuying(false);
+        trackClick('premium_purchase');
         toast.success('프리미엄이 적용됐어요. 이제 광고 없이 이용하세요!');
         onClose();
       },
