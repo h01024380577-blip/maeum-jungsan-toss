@@ -4,8 +4,8 @@
   "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "dev": "granite dev",
-    "build": "npm run build:artifact",
+    "dev": "next dev",
+    "build": "npm run build:ait && npm run build:artifact",
     "build:artifact": "ait build && node scripts/verify-ait-artifact.mjs",
     "build:next": "prisma generate && next build",
     "build:csr": "NEXT_BUILD_CSR=1 prisma generate && next build",
@@ -15,12 +15,12 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^2.9.3",
+    "@apps-in-toss/web-framework": "^3.4.0",
     "@emotion/react": "^11.14.0",
     "@google/genai": "^1.29.0",
     "@prisma/client": "^6.19.2",
     "@tailwindcss/postcss": "^4.2.2",
-    "@toss/tds-mobile": "^2.3.0",
+    "@toss/tds-mobile": "^2.5.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
@@ -34,6 +34,7 @@
     "react": "^19.0.0",
     "react-calendar": "^6.0.0",
     "react-dom": "^19.0.0",
+    "react-is": "^19.3.0",
     "recharts": "^3.8.1",
     "resend": "^6.10.0",
     "sonner": "^2.0.7",

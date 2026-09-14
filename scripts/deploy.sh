@@ -69,13 +69,13 @@ echo "✅ Health check passed (200)"
 #     app/layout.tsx 같은 최상위 파일을 놓친다 (app/calendar/page.tsx 만 잡힘)
 #   - '!app/api/**' 는 git 의 제외 문법이 아니다 (":(exclude)" 가 맞음).
 #     리터럴 경로로 취급돼 사실상 무시되고, API 전용 커밋도 번들을 재빌드했다.
-# granite.config.ts / next.config.ts 는 AIT 번들에만/양쪽에 영향을 주므로 포함.
+# apps-in-toss.config.ts / next.config.ts 는 AIT 번들에만/양쪽에 영향을 주므로 포함.
 #
 # 주의: .env 는 git 추적 대상이 아니라 여기서 감지되지 않는다.
 # NEXT_PUBLIC_* 값은 번들에 박히므로, env 만 바꿨을 땐 수동으로 재빌드할 것.
 CLIENT_CHANGED=$(git diff HEAD~1 --name-only -- \
   src components public app \
-  granite.config.ts next.config.ts \
+  apps-in-toss.config.ts next.config.ts \
   ':(exclude)app/api' | head -1)
 
 if [ -n "$CLIENT_CHANGED" ]; then

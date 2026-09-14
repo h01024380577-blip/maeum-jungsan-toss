@@ -10,9 +10,9 @@ Key features: AI-powered invitation URL parsing (Gemini 2.5 Flash), CSV bulk imp
 
 ## Commands
 
-- **Dev server:** `npm run dev` (runs `granite dev` — Apps-in-Toss dev wrapper around `next dev`)
+- **Dev server:** `npm run dev` (plain `next dev` — SDK 3.x moved dev/build out of the CLI into `package.json`)
 - **Build (Next.js full, with API):** `npm run build:next` (runs `prisma generate && next build`) — used on EC2 for the server build
-- **Build (Toss AIT bundle):** `npm run build` (runs `granite build` → `npm run build:ait`) — produces the CSR-only client bundle in `dist/web/` for upload to the Toss platform
+- **Build (Toss AIT bundle):** `npm run build` (runs `npm run build:ait` → `npm run build:artifact` = `ait build && node scripts/verify-ait-artifact.mjs`) — produces the CSR client bundle in `dist/web/`, packages it into `maeum-jungsan.ait`, and verifies the artifact
 - **Build (CSR only, manual):** `npm run build:csr` (sets `NEXT_BUILD_CSR=1`)
 - **Production server:** `npm run start` (next start, after `build:next`)
 - **Lint:** `npm run lint`
@@ -25,7 +25,7 @@ Key features: AI-powered invitation URL parsing (Gemini 2.5 Flash), CSV bulk imp
 
 ### Platform: Apps-in-Toss (`@apps-in-toss/web-framework`)
 
-This is **not** a standard Next.js or Vercel app. It's a Toss mini-app configured in `granite.config.ts`. The `granite` CLI wraps Next.js dev/build. The app requests permissions: `CLIPBOARD` (read/write), `CONTACTS` (read).
+This is **not** a standard Next.js or Vercel app. It's a Toss mini-app configured in `apps-in-toss.config.ts` (SDK **3.x**). Since SDK 3.x the CLI no longer wraps dev/build — `npm run dev`/`build` call Next.js directly and `ait build` only packages the artifact. The app requests permissions: `clipboard` (read/write), `photos` (read), `camera`, `contacts` (read).
 
 Stack: **Next.js 16** (App Router) + **React 19** + **Tailwind CSS v4** (`@tailwindcss/postcss`) + **TypeScript 5.8** + **Vitest 4**. Verify API shapes before coding — these are recent major versions.
 
@@ -34,7 +34,7 @@ Stack: **Next.js 16** (App Router) + **React 19** + **Tailwind CSS v4** (`@tailw
 The same Next.js codebase produces **two distinct artifacts**, each deployed differently:
 
 1. **Server build (`build:next`)** — full Next.js app including `app/api/*` route handlers. Runs on **EC2** under `pm2` (process name `maeum-jungsan`). Owns Prisma, Gemini, Toss server APIs, cron endpoints. Public host serves both pages and JSON APIs.
-2. **AIT CSR bundle (`build:ait`)** — `scripts/build-ait.sh` temporarily moves `app/api` → `app/_api_ait_backup`, sets `NEXT_BUILD_CSR=1`, runs `next build`, then restores `app/api` via a `trap`. This produces a static client bundle in `dist/web/` to upload to Toss via `granite deploy`. The bundle's API calls hit the EC2 host over the network (see `src/lib/apiClient.ts`).
+2. **AIT CSR bundle (`build:ait`)** — `scripts/build-ait.sh` temporarily moves `app/api` → `app/_api_ait_backup`, sets `NEXT_BUILD_CSR=1`, runs `next build`, then restores `app/api` via a `trap`. This produces a static client bundle in `dist/web/`, which `ait build` packages into `maeum-jungsan.ait` for upload via `npx ait deploy`. The bundle's API calls hit the EC2 host over the network (see `src/lib/apiClient.ts`).
 
 When editing API routes, only the EC2 build needs to redeploy. When editing `src/`, `components/`, `app/**/*.tsx`, `public/`, or `styles/`, both builds need to redeploy — `scripts/deploy.sh` detects this via `git diff HEAD~1` and conditionally rebuilds the AIT bundle.
 
@@ -180,4 +180,6 @@ UI is entirely in Korean. All user-facing strings, labels, and AI prompts are Ko
 - Supabase Direct connection DNS (`db.*.supabase.co`)가 로컬에서 안 풀릴 수 있음 — `DIRECT_URL`은 session pooler 사용
 - Build output goes to `dist/` (not `.next/`) — configured via `distDir: 'dist'` in `next.config.ts`
 - `scripts/build-ait.sh` deliberately excludes `app/api` from the CSR bundle by moving it aside — if the script crashes before the `trap`, manually restore `app/_api_ait_backup` → `app/api`
+- SDK 3.x `ait build` packs `webBundleDir` (= `dist/web`) **as-is** under a `sources/` prefix and requires `index.html` at its root; 2.x instead looked for `<outdir>/web/` and also shipped React Native bundles (`bundle.ios.*`), which 3.x no longer produces. Because the directory is copied verbatim, anything `build-ait.sh` fails to clean (server output, `.DS_Store`) ends up in the artifact — `scripts/verify-ait-artifact.mjs` guards this
+- `recharts` declares `react-is` as a **peerDependency**, and installs use `--legacy-peer-deps`, so it must stay an explicit dependency. It used to be satisfied by accident via the 27MB SDK 2.x dependency tree; SDK 3.x dropped those and the CSR build broke with `Can't resolve 'react-is'`
 - The app runs on **EC2 + pm2**, not Vercel. Don't suggest `vercel deploy`, Vercel Cron, or edge-runtime features — serverless assumptions don't apply

@@ -11,7 +11,11 @@ cleanup_server_artifacts() {
   # the .ait artifact. Next.js 16 can leave server-only directories and symlinks
   # in the custom distDir, and a broken symlink makes that collection step return
   # an empty file list. Keep only static runtime assets for the WebView bundle.
+  #
+  # SDK 3.x 부터 webBundleDir(=dist/web) 이 통째로 아티팩트에 실리므로,
+  # macOS 가 남기는 .DS_Store 까지 그대로 번들에 들어간다. 함께 제거한다.
   find dist/web -type l -delete 2>/dev/null || true
+  find dist/web -name '.DS_Store' -delete 2>/dev/null || true
   rm -rf \
     dist/dev \
     dist/web/build \
