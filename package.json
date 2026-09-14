@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "npm run build:ait && npm run build:artifact",
     "build:artifact": "ait build && node scripts/verify-ait-artifact.mjs",
     "build:next": "prisma generate && next build",
@@ -44,6 +44,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@apps-in-toss/devtools": "^3.2.0",
     "@types/cheerio": "^0.22.35",
     "@types/node": "^22.14.0",
     "@types/papaparse": "^5.5.2",

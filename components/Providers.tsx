@@ -1,5 +1,8 @@
 "use client";
 
+// dev 에서만 AIT Devtools 패널을 띄운다. 프로덕션 빌드에서는 통째로 제거된다.
+import "@/src/lib/aitDevtools";
+
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";

@@ -10,7 +10,7 @@ Key features: AI-powered invitation URL parsing (Gemini 2.5 Flash), CSV bulk imp
 
 ## Commands
 
-- **Dev server:** `npm run dev` (plain `next dev` — SDK 3.x moved dev/build out of the CLI into `package.json`)
+- **Dev server:** `npm run dev` (`next dev --webpack` — SDK 3.x moved dev/build out of the CLI into `package.json`; `--webpack` is required because AIT Devtools has no Turbopack adapter, see below)
 - **Build (Next.js full, with API):** `npm run build:next` (runs `prisma generate && next build`) — used on EC2 for the server build
 - **Build (Toss AIT bundle):** `npm run build` (runs `npm run build:ait` → `npm run build:artifact` = `ait build && node scripts/verify-ait-artifact.mjs`) — produces the CSR client bundle in `dist/web/`, packages it into `maeum-jungsan.ait`, and verifies the artifact
 - **Build (CSR only, manual):** `npm run build:csr` (sets `NEXT_BUILD_CSR=1`)
@@ -181,5 +181,6 @@ UI is entirely in Korean. All user-facing strings, labels, and AI prompts are Ko
 - Build output goes to `dist/` (not `.next/`) — configured via `distDir: 'dist'` in `next.config.ts`
 - `scripts/build-ait.sh` deliberately excludes `app/api` from the CSR bundle by moving it aside — if the script crashes before the `trap`, manually restore `app/_api_ait_backup` → `app/api`
 - SDK 3.x `ait build` packs `webBundleDir` (= `dist/web`) **as-is** under a `sources/` prefix and requires `index.html` at its root; 2.x instead looked for `<outdir>/web/` and also shipped React Native bundles (`bundle.ios.*`), which 3.x no longer produces. Because the directory is copied verbatim, anything `build-ait.sh` fails to clean (server output, `.DS_Store`) ends up in the artifact — `scripts/verify-ait-artifact.mjs` guards this
+- **AIT Devtools** (browser SDK mock + debug panel) is wired for dev only, and its packaging assumes a Vite SPA, so three things are load-bearing: (1) `dev` must be `next dev --webpack` — `unplugin` ships no Turbopack adapter; (2) the panel is imported explicitly from `src/lib/aitDevtools.ts`, not via the plugin's `entryPattern` auto-injection, which matches nothing in App Router and prepends above `"use client"`; (3) `next.config.ts` marks `node-cron` as a webpack server external, since `instrumentation.ts` pulls `node:crypto` which webpack can't resolve (Turbopack could). Production builds use Turbopack and exclude devtools entirely — `scripts/verify-ait-artifact.mjs` plus a grep of the artifact confirm this
 - `recharts` declares `react-is` as a **peerDependency**, and installs use `--legacy-peer-deps`, so it must stay an explicit dependency. It used to be satisfied by accident via the 27MB SDK 2.x dependency tree; SDK 3.x dropped those and the CSR build broke with `Can't resolve 'react-is'`
 - The app runs on **EC2 + pm2**, not Vercel. Don't suggest `vercel deploy`, Vercel Cron, or edge-runtime features — serverless assumptions don't apply
