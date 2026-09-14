@@ -36,7 +36,7 @@ The same Next.js codebase produces **two distinct artifacts**, each deployed dif
 1. **Server build (`build:next`)** — full Next.js app including `app/api/*` route handlers. Runs on **EC2** under `pm2` (process name `maeum-jungsan`). Owns Prisma, Gemini, Toss server APIs, cron endpoints. Public host serves both pages and JSON APIs.
 2. **AIT CSR bundle (`build:ait`)** — `scripts/build-ait.sh` temporarily moves `app/api` → `app/_api_ait_backup`, sets `NEXT_BUILD_CSR=1`, runs `next build`, then restores `app/api` via a `trap`. This produces a static client bundle in `dist/web/`, which `ait build` packages into `maeum-jungsan.ait` for upload via `npx ait deploy`. The bundle's API calls hit the EC2 host over the network (see `src/lib/apiClient.ts`).
 
-When editing API routes, only the EC2 build needs to redeploy. When editing `src/`, `components/`, `app/**/*.tsx`, `public/`, or `styles/`, both builds need to redeploy — `scripts/deploy.sh` detects this via `git diff HEAD~1` and conditionally rebuilds the AIT bundle.
+When editing API routes, only the EC2 build needs to redeploy. When editing `src/`, `components/`, `app/**/*.tsx`, `public/`, or `styles/`, both builds need to redeploy — `scripts/deploy.sh` detects this by diffing the commit EC2 pointed at *before* the push (captured via `git ls-remote seoul`) against `HEAD`, and conditionally rebuilds the AIT bundle. It deliberately does **not** use `git diff HEAD~1` — that only inspects the last commit, so batch-pushing several commits silently skipped the rebuild and shipped a stale bundle. When the base commit can't be resolved, or `maeum-jungsan.ait` is missing, it rebuilds rather than skipping.
 
 ### Authentication
 

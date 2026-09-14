@@ -12,6 +12,11 @@ LOCAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # 푸시 즉시 원격 워킹트리가 갱신된다(서버가 GitHub에서 pull 하지 않음 — 서버에 git 인증 불필요).
 echo "📤 Pushing to remotes (aws=GitHub, seoul=EC2)..."
 cd "$LOCAL_DIR"
+
+# 푸시 전 EC2 가 가리키던 커밋 — 3단계의 AIT 번들 재빌드 판단 기준점이다.
+# 푸시하고 나면 알아낼 방법이 없으므로 반드시 여기서 잡아둔다.
+DEPLOYED_BEFORE=$(git ls-remote --heads seoul main 2>/dev/null | cut -f1 || true)
+
 git push aws main
 # seoul(EC2) updateInstead 푸시는 워킹트리에 변경이 있으면 거부됨.
 # npm install이 남기는 package-lock.json 변경을 푸시 전에 자동 정리.
@@ -62,7 +67,12 @@ fi
 echo "✅ Health check passed (200)"
 
 # --- 3. AIT 번들 재생성 (클라이언트 변경 시) ---
-# 최근 커밋에서 클라이언트 파일 변경 여부 확인.
+# 배포 직전 EC2 가 가리키던 커밋(DEPLOYED_BEFORE)부터 HEAD 까지를 비교한다.
+#
+# 예전엔 `git diff HEAD~1` 이었는데, 커밋을 여러 개 모아서 푸시하면 마지막 커밋
+# 하나만 보게 돼 앞선 커밋의 클라이언트 변경을 통째로 놓쳤다. 그러면 UI 수정이
+# 번들에 반영되지 않은 채 배포가 "성공"으로 끝난다 — 조용히 새는 종류의 사고다.
+# (2026-09-14 SDK 3.x 마이그레이션 배포에서 실제로 발생: next.config.ts 변경을 놓침.)
 #
 # 디렉터리 pathspec + :(exclude) 를 쓴다. glob 을 쓰면 조용히 새는 경우가 있음:
 #   - 'app/**/*.tsx' 는 git wildmatch 특성상 `**` 뒤에 리터럴 `/` 를 요구해서
@@ -73,13 +83,27 @@ echo "✅ Health check passed (200)"
 #
 # 주의: .env 는 git 추적 대상이 아니라 여기서 감지되지 않는다.
 # NEXT_PUBLIC_* 값은 번들에 박히므로, env 만 바꿨을 땐 수동으로 재빌드할 것.
-CLIENT_CHANGED=$(git diff HEAD~1 --name-only -- \
-  src components public app \
-  apps-in-toss.config.ts next.config.ts \
-  ':(exclude)app/api' | head -1)
+BASE_REF=""
+if [ -n "$DEPLOYED_BEFORE" ] && git cat-file -e "${DEPLOYED_BEFORE}^{commit}" 2>/dev/null; then
+  BASE_REF="$DEPLOYED_BEFORE"
+fi
+
+if [ -z "$BASE_REF" ] || [ ! -f "$LOCAL_DIR/maeum-jungsan.ait" ]; then
+  # 기준 커밋을 못 잡았거나(최초 배포·ls-remote 실패) 아티팩트 자체가 없으면
+  # 건너뛰지 않고 무조건 재빌드한다.
+  # 스킵은 조용히 틀리고 재빌드는 시끄럽게 맞다 — 애매하면 재빌드가 안전하다.
+  CLIENT_CHANGED="(기준 커밋 불명 또는 아티팩트 없음)"
+  REBUILD_REASON="$CLIENT_CHANGED"
+else
+  CLIENT_CHANGED=$(git diff "$BASE_REF" HEAD --name-only -- \
+    src components public app \
+    apps-in-toss.config.ts next.config.ts \
+    ':(exclude)app/api' | head -1)
+  REBUILD_REASON="${BASE_REF:0:7}..$(git rev-parse --short HEAD)"
+fi
 
 if [ -n "$CLIENT_CHANGED" ]; then
-  echo "📱 Client changes detected — rebuilding AIT bundle..."
+  echo "📱 Client changes detected ($REBUILD_REASON) — rebuilding AIT bundle..."
   cd "$LOCAL_DIR"
   rm -rf dist
   npm run build:ait
