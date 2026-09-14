@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
 const isCSR = process.env.NEXT_BUILD_CSR === '1';
+const isDev = process.env.NODE_ENV === 'development';
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 
 // devDependency 라서 프로덕션에서 없을 수도 있다. dev 분기 안에서만 로드해
@@ -11,7 +12,10 @@ const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const requireCjs = createRequire(import.meta.url);
 
 const nextConfig: NextConfig = {
-  distDir: isCSR ? 'dist/web' : 'dist',
+  // dev 는 dist-dev 로 분리한다. 예전엔 dev 도 dist/ 를 썼는데, build:ait 와
+  // deploy.sh 가 `rm -rf dist` 로 시작하기 때문에 빌드를 돌리면 실행 중이던 dev
+  // 서버의 산출물이 통째로 사라져 이후 모든 요청이 ENOENT 500 으로 죽었다.
+  distDir: isCSR ? 'dist/web' : isDev ? 'dist-dev' : 'dist',
   ...(isCSR ? { output: 'export' } : {}),
   turbopack: {
     root: repoRoot,
