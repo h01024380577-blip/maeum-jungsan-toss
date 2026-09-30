@@ -590,6 +590,12 @@ export default function HomeTab() {
           >
             {isSaving ? '저장 중...' : '저장하기'}
           </button>
+          {/* 광고 노출 사전 안내 — 프리미엄은 광고가 없으므로 숨김 */}
+          {!isPremium && (
+            <p className="mt-2 text-center text-[12px] font-semibold text-gray-400">
+              저장 후 짧은 광고가 재생돼요
+            </p>
+          )}
         </div>
       </div>
 
