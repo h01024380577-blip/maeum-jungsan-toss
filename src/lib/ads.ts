@@ -192,3 +192,16 @@ export async function showRewardedAd(adGroupId: string): Promise<ShowRewardedAdO
     });
   });
 }
+
+const TEST_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
+
+/**
+ * 일반 저장 시 보여줄 전면 광고그룹 ID.
+ * 전면형 그룹이 따로 설정되지 않았으면 리워드 그룹을 재사용한다(보상과 무관하게 저장은 진행).
+ */
+export function getSaveAdGroupId(): string {
+  const configured = process.env.NEXT_PUBLIC_AD_GROUP_ID_INTERSTITIAL;
+  if (configured?.trim()) return configured.trim();
+  if (process.env.NODE_ENV !== 'production') return TEST_INTERSTITIAL_AD_GROUP_ID;
+  return getAdGroupId();
+}

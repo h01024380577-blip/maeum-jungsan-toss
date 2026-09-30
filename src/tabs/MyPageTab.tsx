@@ -73,7 +73,7 @@ export default function MyPageTab() {
         </section>
 
         {/* 배너 광고 — 기존 통계 탭 하단 위치 승계 */}
-        {STATS_BANNER_AD_GROUP_ID && (
+        {!isPremium && STATS_BANNER_AD_GROUP_ID && (
           <InlineBanner
             adGroupId={STATS_BANNER_AD_GROUP_ID}
             className="mt-2"

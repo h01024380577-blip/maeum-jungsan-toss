@@ -75,6 +75,7 @@ export default function PremiumSheet({ open, onClose }: Props) {
         <ul className="mt-4 space-y-2 text-sm text-gray-700">
           <li>• AI 분석을 광고 없이 무제한</li>
           <li>• 대량 가져오기를 광고 없이 무제한</li>
+          <li>• 내역 저장·배너 등 모든 광고 제거</li>
           <li>• 한 번 구매하면 평생 유지</li>
         </ul>
 

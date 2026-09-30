@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/src/lib/apiClient';
 import { trackClick } from '@/src/lib/analytics';
 import { useRewardedAd } from '@/src/hooks/useRewardedAd';
+import { useInterstitialAd } from '@/src/hooks/useInterstitialAd';
 import { Sparkles, ArrowUpRight, ArrowDownLeft, Image as ImageIcon, Camera, X as CloseIcon, Heart, Flower2, Cake, Star, Plus, Minus, ChevronRight, Wallet, Copy, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useStore, type EventEntry, type EventType } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +14,7 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { formatManInputValue, parseManInputToWon } from '../utils/amountFormat';
 import { normalizeImageDataUri } from '../utils/imageDataUri';
 import { openExternalUrl } from '../lib/openExternalUrl';
+import { RELATION_PRESETS } from '../utils/relationPresets';
 
 // 금액 추천 로직: 과거 이력·관계·장소를 분석해 상황별 문구 풀에서 매칭되는 구절을 랜덤 선택
 function recommendAmount(parsed: any, entries: EventEntry[]): { amt: number; reason: string } {
@@ -165,7 +167,10 @@ export default function HomeTab() {
   const [aiInputUrl, setAiInputUrl] = useState('');
   const [aiSelectedImage, setAiSelectedImage] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
-  const { watch: watchAiAd } = useRewardedAd('AI_CREDIT');
+  const { run: runAiAd } = useRewardedAd('AI_CREDIT');
+  // 일반 저장 시 전면 광고 — 프리미엄은 로드조차 하지 않음
+  const { show: showSaveAd } = useInterstitialAd(!isPremium);
+  const [isSaving, setIsSaving] = useState(false);
 
   // 메인 폼 상태
   const [formData, setFormData] = useState<Partial<EventEntry>>(defaultFormData());
@@ -248,103 +253,30 @@ export default function HomeTab() {
     }
   };
 
-  // 확인 다이얼로그 없이 바로 리워드 광고를 재생 → nonce 획득 시 실제 분석 진행
-  // 프리미엄 사용자는 광고를 건너뛰고 빈 nonce로 바로 실행
-  const startAiParse = async (params: { type: 'url' | 'image'; data: string }) => {
-    trackClick('analyze_start', { input_type: params.type, is_premium: isPremium });
-    if (isPremium) {
-      handleAiParse(params, '');
-      return;
-    }
-    const nonce = await watchAiAd();
-    if (nonce) handleAiParse(params, nonce);
+  const requestAiParse = async (params: { type: 'url' | 'image'; data: string }, permissionNonce: string) => {
+    const res = await apiFetch('/api/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ type: params.type, data: params.data, permissionNonce }),
+    });
+    return res.json();
   };
 
-  const handleAiParse = async (params: { type: 'url' | 'image'; data: string }, permissionNonce: string) => {
-    const { type, data } = params;
-    if (!data) return;
-
+  // 버튼을 누르는 즉시 분석을 시작하고, 광고는 분석과 동시에 재생한다.
+  // 광고를 끝까지 보지 않으면 분석 결과는 버린다. 프리미엄은 광고 없이 바로 실행.
+  const startAiParse = async (params: { type: 'url' | 'image'; data: string }) => {
+    if (!params.data || isParsing) return;
+    trackClick('analyze_start', { input_type: params.type, is_premium: isPremium });
     setIsParsing(true);
     try {
-      const res = await apiFetch('/api/analyze', {
-        method: 'POST',
-        body: JSON.stringify({ type, data, permissionNonce }),
-      });
-      const result = await res.json();
-
-      if (!result.success) {
-        if (result.reason === 'rate_limit') {
-          toast.error('무료 분석 한도를 모두 이용하셨습니다. 잠시 후 다시 시도해 주세요.', { duration: 4000, icon: <AlertCircle size={16} /> });
-        } else if (result.reason === 'temporarily_unavailable') {
-          toast.error(result.message || 'AI 서비스가 잠시 혼잡해요. 잠시 후 다시 시도해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
-        } else if (result.reason === 'low_confidence') {
-          toast.info(result.message || '초대장 정보를 충분히 읽지 못했어요. 직접 입력을 이용해 주세요.', { duration: 4000, icon: <Info size={16} /> });
-        } else {
-          toast.error('분석 실패. 직접 입력을 이용해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
-        }
-        setAiSelectedImage(null);
-        setAiInputUrl('');
-        setIsParsing(false);
-        return;
+      let result: any;
+      if (isPremium) {
+        result = await requestAiParse(params, '');
+      } else {
+        const outcome = await runAiAd((nonce) => requestAiParse(params, nonce));
+        if (!outcome) return;
+        result = outcome.result;
       }
-
-      const parsed = result.data;
-      const { amt, reason } = recommendAmount(parsed, entries);
-
-      const rawDate = parsed.date || format(new Date(), 'yyyy-MM-dd');
-      let normalizedDate = rawDate;
-      try {
-        const d = new Date(rawDate);
-        if (!isNaN(d.getTime())) normalizedDate = format(d, 'yyyy-MM-dd');
-      } catch {}
-
-      let targetName = parsed.targetName || '';
-      let suggestedNames = parsed.suggestedNames || [];
-      if (targetName.includes(',') && (!Array.isArray(suggestedNames) || suggestedNames.length === 0)) {
-        const names = targetName.split(/[,，]\s*/).map((n: string) => n.trim()).filter(Boolean);
-        if (names.length >= 2) {
-          const et = parsed.eventType || 'other';
-          const roles = et === 'wedding' ? ['신랑측', '신부측'] : et === 'funeral' ? ['고인', '상주'] : ['주인공', '관련인'];
-          suggestedNames = names.map((n: string, i: number) => ({ name: n, label: `${roles[i] || '기타'} · ${n}` }));
-          targetName = names[0];
-        }
-      }
-
-      let account = parsed.account || '';
-      let suggestedAccounts = parsed.suggestedAccounts || [];
-      if (account.includes(',') && (!Array.isArray(suggestedAccounts) || suggestedAccounts.length === 0)) {
-        const accts = account.split(/[,，]\s*/).map((a: string) => a.trim()).filter(Boolean);
-        if (accts.length >= 2) {
-          suggestedAccounts = accts.map((a: string, i: number) => ({ account: a, label: `계좌 ${i + 1} · ${a.split(' ')[0]}` }));
-          account = accts[0];
-        }
-      }
-
-      const finalData: Partial<EventEntry> = {
-        ...parsed,
-        targetName,
-        suggestedNames,
-        account,
-        suggestedAccounts,
-        date: normalizedDate,
-        amount: parsed.amount || amt,
-        recommendationReason: reason,
-        type: parsed.type || 'EXPENSE',
-        isIncome: parsed.type === 'INCOME',
-        relation: parsed.relation || '친구',
-      };
-
-      setFormData(finalData);
-      setInitialFormData(finalData);
-      setShowAiSheet(false);
-      setAiInputUrl('');
-      setAiSelectedImage(null);
-      trackClick('analyze_success', {
-        input_type: type,
-        confidence: parsed.confidence ?? result.confidence ?? null,
-        event_type: parsed.eventType ?? null,
-      });
-      toast.success('AI 분석 완료! 내용을 확인해주세요.', { duration: 2000, icon: <Sparkles size={16} /> });
+      applyAiParseResult(params.type, result);
     } catch (err: any) {
       toast.error(`분석 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
       setAiSelectedImage(null);
@@ -354,14 +286,93 @@ export default function HomeTab() {
     }
   };
 
+  const applyAiParseResult = (type: 'url' | 'image', result: any) => {
+    if (!result.success) {
+      if (result.reason === 'rate_limit') {
+        toast.error('무료 분석 한도를 모두 이용하셨습니다. 잠시 후 다시 시도해 주세요.', { duration: 4000, icon: <AlertCircle size={16} /> });
+      } else if (result.reason === 'temporarily_unavailable') {
+        toast.error(result.message || 'AI 서비스가 잠시 혼잡해요. 잠시 후 다시 시도해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
+      } else if (result.reason === 'low_confidence') {
+        toast.info(result.message || '초대장 정보를 충분히 읽지 못했어요. 직접 입력을 이용해 주세요.', { duration: 4000, icon: <Info size={16} /> });
+      } else {
+        toast.error('분석 실패. 직접 입력을 이용해 주세요.', { duration: 3500, icon: <AlertCircle size={16} /> });
+      }
+      setAiSelectedImage(null);
+      setAiInputUrl('');
+      return;
+    }
+
+    const parsed = result.data;
+    const { amt, reason } = recommendAmount(parsed, entries);
+
+    const rawDate = parsed.date || format(new Date(), 'yyyy-MM-dd');
+    let normalizedDate = rawDate;
+    try {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) normalizedDate = format(d, 'yyyy-MM-dd');
+    } catch {}
+
+    let targetName = parsed.targetName || '';
+    let suggestedNames = parsed.suggestedNames || [];
+    if (targetName.includes(',') && (!Array.isArray(suggestedNames) || suggestedNames.length === 0)) {
+      const names = targetName.split(/[,，]\s*/).map((n: string) => n.trim()).filter(Boolean);
+      if (names.length >= 2) {
+        const et = parsed.eventType || 'other';
+        const roles = et === 'wedding' ? ['신랑측', '신부측'] : et === 'funeral' ? ['고인', '상주'] : ['주인공', '관련인'];
+        suggestedNames = names.map((n: string, i: number) => ({ name: n, label: `${roles[i] || '기타'} · ${n}` }));
+        targetName = names[0];
+      }
+    }
+
+    let account = parsed.account || '';
+    let suggestedAccounts = parsed.suggestedAccounts || [];
+    if (account.includes(',') && (!Array.isArray(suggestedAccounts) || suggestedAccounts.length === 0)) {
+      const accts = account.split(/[,，]\s*/).map((a: string) => a.trim()).filter(Boolean);
+      if (accts.length >= 2) {
+        suggestedAccounts = accts.map((a: string, i: number) => ({ account: a, label: `계좌 ${i + 1} · ${a.split(' ')[0]}` }));
+        account = accts[0];
+      }
+    }
+
+    const finalData: Partial<EventEntry> = {
+      ...parsed,
+      targetName,
+      suggestedNames,
+      account,
+      suggestedAccounts,
+      date: normalizedDate,
+      amount: parsed.amount || amt,
+      recommendationReason: reason,
+      type: parsed.type || 'EXPENSE',
+      isIncome: parsed.type === 'INCOME',
+      relation: parsed.relation || '친구',
+    };
+
+    setFormData(finalData);
+    setInitialFormData(finalData);
+    setShowAiSheet(false);
+    setAiInputUrl('');
+    setAiSelectedImage(null);
+    trackClick('analyze_success', {
+      input_type: type,
+      confidence: parsed.confidence ?? result.confidence ?? null,
+      event_type: parsed.eventType ?? null,
+    });
+    toast.success('AI 분석 완료! 내용을 확인해주세요.', { duration: 2000, icon: <Sparkles size={16} /> });
+  };
+
   const handleSave = async () => {
     if (!formData.targetName?.trim()) {
       toast.error('이름을 입력해주세요.', { duration: 2000, icon: <AlertCircle size={16} /> });
       return;
     }
+    if (isSaving) return;
     if (initialFormData && JSON.stringify(initialFormData) !== JSON.stringify(formData)) {
       addFeedback(initialFormData, formData);
     }
+    setIsSaving(true);
+    // 저장은 바로 시작하고 광고는 동시에 재생 — 광고가 닫힌 뒤 결과를 안내한다
+    const adPromise = showSaveAd();
     try {
       await addEntry({
         contactId: formData.contactId || '',
@@ -378,6 +389,7 @@ export default function HomeTab() {
         recommendationReason: formData.recommendationReason || '',
         customEventName: formData.customEventName || '',
       });
+      await adPromise;
       trackClick('entry_save', {
         entry_type: formData.isIncome ? 'INCOME' : 'EXPENSE',
         event_type: formData.eventType ?? 'other',
@@ -394,7 +406,10 @@ export default function HomeTab() {
       setFormData(defaultFormData());
       setInitialFormData(null);
     } catch (err: any) {
+      await adPromise;
       toast.error(`저장 실패: ${err?.message || '알 수 없는 오류'}`, { duration: 3500, icon: <AlertCircle size={16} /> });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -488,6 +503,7 @@ export default function HomeTab() {
             />
             <Field
               label="관계"
+              type="relation"
               compact
               value={formData.relation}
               onChange={(v: string) => updateFormData({ ...formData, relation: v })}
@@ -565,14 +581,14 @@ export default function HomeTab() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!formData.targetName?.trim()}
+            disabled={!formData.targetName?.trim() || isSaving}
             className={`h-14 w-full rounded-2xl text-[16px] font-black transition-all active:scale-[0.98] ${
               !formData.targetName?.trim()
                 ? 'bg-gray-100 text-gray-300'
                 : 'bg-blue-600 text-white shadow-lg shadow-blue-200'
             }`}
           >
-            저장하기
+            {isSaving ? '저장 중...' : '저장하기'}
           </button>
         </div>
       </div>
@@ -1076,6 +1092,8 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
             <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} className={`${inputClass} appearance-none`}>
               {options.map((o: string) => <option key={o} value={o}>{eventLabel(o)}</option>)}
             </select>
+          ) : type === 'relation' ? (
+            <input ref={(node) => { inputRef.current = node; }} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
           ) : type === 'contact' ? (
             <input ref={(node) => { inputRef.current = node; }} type="text" value={localValue} placeholder={placeholder} onFocus={handleFocus(() => setShow(true))} onBlur={() => setTimeout(() => setShow(false), 200)} onChange={handleInputChange} onCompositionStart={handleCompositionStart} onCompositionEnd={handleCompositionEnd} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} className={inputClass} />
           ) : type === 'date' ? (
@@ -1112,6 +1130,25 @@ function Field({ label, value, onChange, type = 'text', options = [], ai = false
           </div>
         )}
       </div>
+
+      {type === 'relation' && show && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
+          {RELATION_PRESETS.map((relation) => {
+            const isSelected = relation === value;
+            return (
+              <button
+                key={relation}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onChange(relation); setShow(false); inputRef.current?.blur(); }}
+                className={`w-full px-4 py-3 text-left text-sm font-bold hover:bg-gray-50 ${isSelected ? 'text-blue-600' : 'text-gray-800'}`}
+              >
+                {relation}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {type === 'contact' && show && contactSuggestions.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-44 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-lg">
