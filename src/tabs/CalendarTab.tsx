@@ -3,12 +3,13 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { useStore, type EventEntry } from '../store/useStore';
 import { format, startOfMonth } from 'date-fns';
-import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle, StickyNote } from 'lucide-react';
+import { Heart, Flower2, Cake, Star, MapPin, CalendarPlus, CheckCircle2, AlertCircle, StickyNote, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportEventToCalendar, exportAllEventsToCalendar } from '../lib/exportToCalendar';
 import { isSamsungGalaxyDevice, hasSeenSamsungCalendarHint, markSamsungCalendarHintSeen } from '../lib/platformDetect';
 import SamsungCalendarHintDialog from '../components/SamsungCalendarHintDialog';
 import EntryEditSheet from '../components/EntryEditSheet';
+import EntryCreateSheet from '../components/EntryCreateSheet';
 import { formatAmountMan } from '../utils/amountFormat';
 import {
   getCalendarDisplayEntries,
@@ -30,6 +31,7 @@ export default function CalendarTab() {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<EventEntry | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Samsung Galaxy 안내 모달 — 첫 캘린더 export 시도 시 1회 노출
   const [samsungHintOpen, setSamsungHintOpen] = useState(false);
@@ -195,9 +197,20 @@ export default function CalendarTab() {
         </div>
 
         <div className="space-y-2.5">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">
-            {listTitle} ({visibleEvents.length})
-          </h3>
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+              {listTitle} ({visibleEvents.length})
+            </h3>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-1 rounded-full bg-blue-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm shadow-blue-200 active:scale-95 transition-all"
+              aria-label={selectedDate ? `${format(selectedDate, 'M월 d일')}에 일정 추가` : '일정 추가'}
+            >
+              <Plus size={12} strokeWidth={3} />
+              일정 추가
+            </button>
+          </div>
           {visibleEvents.length > 0 ? (
             visibleEvents.map(e => (
               <div
@@ -257,6 +270,7 @@ export default function CalendarTab() {
       </div>
 
       <EntryEditSheet entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
+      <EntryCreateSheet open={createOpen} initialDate={selectedDate} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }
