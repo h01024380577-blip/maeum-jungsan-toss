@@ -13,9 +13,11 @@ import {
 import type { RewardType } from '@prisma/client';
 
 /**
- * 확인 다이얼로그 없이 리워드 광고를 바로 재생하고 nonce를 반환하는 훅.
+ * 확인 다이얼로그 없이 리워드 광고를 재생하면서 동시에 기능을 실행하는 훅.
  * - 마운트 시 광고를 미리 로드해 둔다(탭 즉시 재생되도록).
- * - watch(): nonce 발급 → 광고 재생 → redeem → nonce 반환. 실패/취소 시 null(사유는 토스트).
+ * - run(task): nonce 발급 → task(nonce) 즉시 시작 + 광고 재생 → 광고를 끝까지 봤으면
+ *   redeem 후 task 결과를 반환. 광고를 끝까지 보지 않았거나 실패하면 null(사유는 토스트).
+ *   서버는 ISSUED 상태 nonce도 소비를 허가하므로 광고가 끝날 때쯤이면 결과가 준비돼 있다.
  */
 export function useRewardedAd(rewardType: RewardType) {
   const adGroupId = getAdGroupId();
@@ -35,7 +37,7 @@ export function useRewardedAd(rewardType: RewardType) {
     };
   }, [adGroupId]);
 
-  const watch = useCallback(async (): Promise<string | null> => {
+  const run = useCallback(async <T,>(task: (nonce: string) => Promise<T>): Promise<{ result: T } | null> => {
     if (busyRef.current) return null;
     if (!adGroupId) {
       toast.error('광고 설정이 아직 완료되지 않았어요.');
@@ -61,7 +63,11 @@ export function useRewardedAd(rewardType: RewardType) {
       const nonceRes = await apiFetch('/api/credits/ad-nonce', {
         method: 'POST',
         body: JSON.stringify({ rewardType, adGroupId }),
-      });
+      }).catch(() => null);
+      if (!nonceRes) {
+        toast.error('네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
+        return null;
+      }
       if (!nonceRes.ok) {
         const err = await nonceRes.json().catch(() => ({}));
         if (err.error === 'active_nonce_limit') {
@@ -71,39 +77,41 @@ export function useRewardedAd(rewardType: RewardType) {
         }
         return null;
       }
-      const { nonce } = await nonceRes.json();
+      const { nonce } = (await nonceRes.json()) as { nonce: string };
 
-      // 2) 광고 재생
-      const outcome = await showRewardedAd(adGroupId);
+      // 2) 기능 실행을 바로 시작하고, 광고는 그 위에 재생
+      const taskPromise = task(nonce);
+      taskPromise.catch(() => {}); // 광고 도중 실패해도 unhandled rejection 방지 — 아래에서 다시 await
+
+      let outcome: Awaited<ReturnType<typeof showRewardedAd>>;
+      try {
+        outcome = await showRewardedAd(adGroupId);
+      } catch {
+        toast.error('광고 로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
+        void preloadRewardedAd(adGroupId);
+        return null;
+      }
       void preloadRewardedAd(adGroupId); // 다음 광고 미리 로드
       if (!outcome.earnedReward) {
         toast.message('광고를 끝까지 시청해야 기능을 사용할 수 있어요.');
         return null;
       }
 
-      // 3) 서버 redeem → REDEEMED nonce 확보
-      const redeemRes = await apiFetch('/api/credits/ad-redeem', {
+      // 3) 시청 기록 redeem — 기능이 먼저 nonce를 소비했어도 서버가 성공 처리한다
+      void apiFetch('/api/credits/ad-redeem', {
         method: 'POST',
         body: JSON.stringify({
           nonce,
           reward: { unitType: outcome.unitType, unitAmount: outcome.unitAmount },
         }),
-      });
-      if (!redeemRes.ok) {
-        toast.error('보상 확인에 실패했어요. 잠시 후 다시 시도해 주세요.');
-        return null;
-      }
+      }).catch(() => {});
 
-      return nonce as string;
-    } catch {
-      toast.error('광고 로드에 실패했어요. 잠시 후 다시 시도해 주세요.');
-      void preloadRewardedAd(adGroupId);
-      return null;
+      return { result: await taskPromise };
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   }, [adGroupId, rewardType]);
 
-  return { watch, busy };
+  return { run, busy };
 }

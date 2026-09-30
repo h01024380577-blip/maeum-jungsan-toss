@@ -134,7 +134,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
   });
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const { watch: watchCsvAd } = useRewardedAd('CSV_CREDIT');
+  const { run: runCsvAd } = useRewardedAd('CSV_CREDIT');
   const [aiState, setAiState] = useState<'idle' | 'mapping' | 'success' | 'failed'>('idle');
   const [aiReason, setAiReason] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'general' | 'backup' | 'deposit'>('general');
@@ -204,16 +204,32 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
-  const analyzeDepositImage = async (imageData: string, permissionNonce: string) => {
+  const requestDepositImage = async (imageData: string, permissionNonce: string) => {
+    const res = await apiFetch('/api/parse-deposit-image', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageData, permissionNonce }),
+    });
+    const json: any = await res.json().catch(() => null);
+    return { ok: res.ok, json };
+  };
+
+  // 버튼을 누르는 즉시 분석을 시작하고, 광고는 분석과 동시에 재생한다.
+  // 광고를 끝까지 보지 않으면 분석 결과는 버린다. 프리미엄은 광고 없이 바로 실행.
+  const startDepositAnalysis = async (imageData: string) => {
+    if (isAnalyzingDeposit) return;
     setError(null);
     setIsAnalyzingDeposit(true);
     try {
-      const res = await apiFetch('/api/parse-deposit-image', {
-        method: 'POST',
-        body: JSON.stringify({ image: imageData, permissionNonce }),
-      });
-      const json: any = await res.json().catch(() => null);
-      if (!res.ok || !json?.success) {
+      let response: { ok: boolean; json: any };
+      if (isPremium) {
+        response = await requestDepositImage(imageData, '');
+      } else {
+        const outcome = await runCsvAd((nonce) => requestDepositImage(imageData, nonce));
+        if (!outcome) return;
+        response = outcome.result;
+      }
+      const { ok, json } = response;
+      if (!ok || !json?.success) {
         const reason = json?.reason;
         if (reason === 'unauthorized') {
           setError('로그인이 필요해요.');
@@ -240,15 +256,6 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     } finally {
       setIsAnalyzingDeposit(false);
     }
-  };
-
-  const startDepositAnalysis = async (imageData: string) => {
-    if (isPremium) {
-      analyzeDepositImage(imageData, '');
-      return;
-    }
-    const nonce = await watchCsvAd();
-    if (nonce) analyzeDepositImage(imageData, nonce);
   };
 
   const handleDepositFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -475,7 +482,7 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
     }
   };
 
-  // 일반/백업 CSV 가져오기 — 광고 시청 후 nonce로 실행
+  // 일반/백업 CSV 가져오기 — 저장(쓰기)은 되돌릴 수 없으므로 광고 시청 완료 후 실행
   // 프리미엄 사용자는 광고 프롬프트를 건너뛰고 빈 nonce로 바로 실행
   const startImport = async () => {
     const processed = importMode === 'backup' ? (backupRows ?? []) : processRows();
@@ -487,8 +494,8 @@ export default function BulkImportModal({ isOpen, onClose }: Props) {
       handleImport('');
       return;
     }
-    const nonce = await watchCsvAd();
-    if (nonce) handleImport(nonce);
+    const outcome = await runCsvAd(async (nonce) => nonce);
+    if (outcome) handleImport(outcome.result);
   };
 
   const handleImport = async (permissionNonce: string) => {

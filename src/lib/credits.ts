@@ -38,7 +38,10 @@ export function isAllowedRewardAdGroupId(adGroupId: string): boolean {
 }
 
 /**
- * 광고 시청으로 얻은 REDEEMED grant를 CONSUMED로 atomic 전환.
+ * 광고 grant를 CONSUMED로 atomic 전환해 기능 실행을 허가한다.
+ * - REDEEMED: 광고 시청 후 실행(구 번들 흐름)
+ * - ISSUED(미만료): 광고 재생과 동시에 실행(신 번들 흐름). 클라이언트는 광고를
+ *   끝까지 보지 않으면 결과를 버리고, redeem은 CONSUMED 상태에서도 기록만 남긴다.
  * 성공(=기능 실행 허가) 시 true, nonce 없음/만료/이미 사용됨이면 false.
  */
 export async function consumeAdPermission(
@@ -51,7 +54,10 @@ export async function consumeAdPermission(
       rewardNonce: nonce,
       userId,
       rewardType,
-      status: 'REDEEMED',
+      OR: [
+        { status: 'REDEEMED' },
+        { status: 'ISSUED', expiresAt: { gt: new Date() } },
+      ],
     },
     data: { status: 'CONSUMED' },
   });

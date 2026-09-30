@@ -36,6 +36,14 @@ export async function POST(req: NextRequest) {
         const staleGrant = await tx.adRewardGrant.findUnique({ where: { rewardNonce: nonce } });
         if (!staleGrant) return { success: false as const, reason: 'nonce_not_found' };
         if (staleGrant.userId !== userId) return { success: false as const, reason: 'nonce_user_mismatch' };
+        // 광고 재생과 동시에 기능이 먼저 실행되어 이미 CONSUMED 된 경우: 시청 기록만 남긴다
+        if (staleGrant.status === 'CONSUMED' && !staleGrant.redeemedAt) {
+          await tx.adRewardGrant.update({
+            where: { id: staleGrant.id },
+            data: { redeemedAt: now },
+          });
+          return { success: true as const, grant: staleGrant };
+        }
         if (staleGrant.status !== 'ISSUED') return { success: false as const, reason: 'nonce_already_used' };
         if (staleGrant.expiresAt <= now) {
           await tx.adRewardGrant.update({

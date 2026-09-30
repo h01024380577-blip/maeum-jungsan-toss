@@ -75,16 +75,28 @@ describe('consumeAdPermission', () => {
     vi.clearAllMocks();
   });
 
-  it('returns true when a REDEEMED grant is transitioned to CONSUMED', async () => {
+  it('transitions a REDEEMED or unexpired ISSUED grant to CONSUMED', async () => {
     vi.mocked(prisma.adRewardGrant.updateMany).mockResolvedValue({ count: 1 });
 
+    const before = Date.now();
     const result = await consumeAdPermission('user-1', 'AI_CREDIT', 'nonce-abc');
 
     expect(result).toBe(true);
     expect(prisma.adRewardGrant.updateMany).toHaveBeenCalledWith({
-      where: { rewardNonce: 'nonce-abc', userId: 'user-1', rewardType: 'AI_CREDIT', status: 'REDEEMED' },
+      where: {
+        rewardNonce: 'nonce-abc',
+        userId: 'user-1',
+        rewardType: 'AI_CREDIT',
+        OR: [
+          { status: 'REDEEMED' },
+          { status: 'ISSUED', expiresAt: { gt: expect.any(Date) } },
+        ],
+      },
       data: { status: 'CONSUMED' },
     });
+    // ISSUED 허용은 만료 전 nonce로 한정 — 비교 기준 시각이 현재여야 한다
+    const where = vi.mocked(prisma.adRewardGrant.updateMany).mock.calls[0][0]!.where as any;
+    expect(where.OR[1].expiresAt.gt.getTime()).toBeGreaterThanOrEqual(before);
   });
 
   it('returns false when no REDEEMED grant matches (ad not watched or nonce already used)', async () => {
